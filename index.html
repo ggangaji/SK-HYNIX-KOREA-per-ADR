@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#0b0f14" />
-  <title>SK hynix ADR 환산값</title>
+  <title>닉스 환율</title>
   <style>
     :root{
       --bg:#0b0f14; --card:#141a22; --card2:#10151c; --text:#f5f7fa;
@@ -19,7 +19,7 @@
     .value{text-align:center;font-size:clamp(56px,16vw,92px);line-height:1;font-weight:800;letter-spacing:-.05em;margin:12px 0 6px}
     .unit{text-align:center;font-size:16px;color:var(--muted);font-weight:700}
     .change{text-align:center;margin-top:10px;font-size:15px;font-weight:700;min-height:20px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}.fxbox{margin-top:10px;background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:14px}.fxright{text-align:right}.compare{font-size:13px;font-weight:800;margin-top:5px}
     .box{background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:14px}
     .label{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:7px}
     .price{font-size:23px;font-weight:800}
@@ -43,7 +43,7 @@
 <main class="wrap">
   <div class="title">SK hynix Korea / ADR</div>
   <section class="hero">
-    <div class="eyebrow">하이닉스 ADR 환산값</div>
+    <div class="eyebrow">닉스 환율</div>
     <div class="value" id="result">--</div>
     <div class="unit">KRW / ADR</div>
     <div class="change" id="change"></div>
@@ -60,6 +60,18 @@
         <div class="price" id="usPrice">--</div>
         <div class="sub">USD</div>
         <div class="session" id="usSession">--</div>
+      </div>
+    </div>
+
+    <div class="fxbox">
+      <div>
+        <div class="label">💱 원/달러 환율 · USD/KRW</div>
+        <div class="price" id="fxPrice">--</div>
+        <div class="sub">KRW per USD</div>
+      </div>
+      <div class="fxright">
+        <div class="label">닉스 환율 − 원/달러</div>
+        <div class="compare" id="fxDiff">--</div>
       </div>
     </div>
 
@@ -93,7 +105,7 @@
       <button id="autoMode">자동 조회로 복귀</button>
     </div>
     <div class="note">
-      미국 SKHY는 <b>프리마켓·정규장·애프터마켓을 포함한 가장 최근 1분봉 체결값</b>을 우선 사용합니다.
+      미국 SKHY는 <b>프리마켓·정규장·애프터마켓을 포함한 가장 최근 1분봉 체결값</b>을 우선 사용합니다. 비교용으로 <b>USD/KRW 원·달러 환율</b>도 함께 조회합니다.
       한국 000660도 가능한 가장 최근 1분봉을 사용합니다. 무료 Yahoo Finance 데이터와 공개 프록시는 지연되거나 일시적으로 실패할 수 있습니다.
     </div>
   </section>
@@ -103,7 +115,7 @@
 const REFRESH_MS = 15000;
 const YAHOO = symbol => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d&includePrePost=true&events=div%2Csplits`;
 
-let timer = null, autoMode = true, previousValue = null, lastKr = null, lastUs = null;
+let timer = null, autoMode = true, previousValue = null, lastKr = null, lastUs = null, lastFx = null;
 
 const $ = id => document.getElementById(id);
 const fmt0 = n => Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0});
@@ -186,15 +198,27 @@ async function fetchJsonWithFallback(url){
   throw lastErr || new Error('시세 요청 실패');
 }
 
-function render(krObj, usObj, source='AUTO'){
+function render(krObj, usObj, fxObj=null, source='AUTO'){
   const kr = krObj.price, us = usObj.price;
   const value = 0.1 * kr / us;
   lastKr = kr; lastUs = us;
+  if(fxObj && fxObj.price>0) lastFx = fxObj.price;
 
   $('krPrice').textContent = fmt0(kr);
   $('usPrice').textContent = '$' + fmt2(us);
   $('result').textContent = fmt2(value);
   $('formula').textContent = `0.1 × ${fmt0(kr)} ÷ ${fmt2(us)} = ${fmt2(value)}`;
+
+  if(lastFx && lastFx>0){
+    $('fxPrice').textContent = fmt2(lastFx);
+    const d = value - lastFx;
+    const pct = d / lastFx * 100;
+    $('fxDiff').textContent = `${d>=0?'+':''}${fmt2(d)} (${pct>=0?'+':''}${pct.toFixed(2)}%)`;
+    $('fxDiff').style.color = d > 0 ? '#35c98a' : d < 0 ? '#ff6677' : '#95a1b2';
+  } else {
+    $('fxPrice').textContent = '--';
+    $('fxDiff').textContent = '--';
+  }
 
   $('krSession').textContent = source==='AUTO' ? detectSession(krObj.meta, krObj.timestamp) : '수동 입력';
   $('usSession').textContent = source==='AUTO' ? detectSession(usObj.meta, usObj.timestamp) : '수동 입력';
@@ -218,11 +242,12 @@ async function updateAuto(){
   if(!autoMode) return;
   setStatus('시세 조회 중…', null);
   try{
-    const [krJson, usJson] = await Promise.all([
+    const [krJson, usJson, fxJson] = await Promise.all([
       fetchJsonWithFallback(YAHOO('000660.KS')),
-      fetchJsonWithFallback(YAHOO('SKHY'))
+      fetchJsonWithFallback(YAHOO('SKHY')),
+      fetchJsonWithFallback(YAHOO('USDKRW=X'))
     ]);
-    render(extractLatest(krJson), extractLatest(usJson), 'AUTO');
+    render(extractLatest(krJson), extractLatest(usJson), extractLatest(fxJson), 'AUTO');
     setStatus('최근 체결가 반영', true);
   } catch(e){
     console.error(e);
@@ -237,7 +262,7 @@ $('manualCalc').addEventListener('click', ()=>{
   const us = Number(($('manualUs').value||'').replaceAll(',',''));
   if(!(kr>0) || !(us>0)){ alert('두 가격을 모두 입력해 주세요.'); return; }
   autoMode=false;
-  render({price:kr},{price:us},'MANUAL');
+  render({price:kr},{price:us}, lastFx ? {price:lastFx} : null, 'MANUAL');
   setStatus('수동 입력', null);
 });
 
@@ -247,7 +272,7 @@ $('copyBtn').addEventListener('click', async ()=>{
   if(!(lastKr>0) || !(lastUs>0)){ alert('먼저 시세를 불러와 주세요.'); return; }
   const value = 0.1 * lastKr / lastUs;
   const text =
-`SK하이닉스 ADR 환산값: ${fmt2(value)}
+`닉스 환율: ${fmt2(value)}
 
 한국 SK하이닉스: ${fmt0(lastKr)}원
 SKHY ADR: $${fmt2(lastUs)}
