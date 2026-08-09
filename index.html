@@ -1,295 +1,72 @@
 <!doctype html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#0b0f14" />
-  <title>닉스 환율</title>
-  <style>
-    :root{
-      --bg:#0b0f14; --card:#141a22; --card2:#10151c; --text:#f5f7fa;
-      --muted:#95a1b2; --line:#26303d; --good:#35c98a; --bad:#ff6677; --accent:#6aa7ff;
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",Arial,sans-serif}
-    .wrap{width:min(680px,100%);margin:0 auto;padding:18px 14px 44px}
-    .title{font-size:14px;color:var(--muted);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:8px 4px 12px}
-    .hero{background:linear-gradient(180deg,#171e27,#11171f);border:1px solid var(--line);border-radius:24px;padding:28px 20px 22px}
-    .eyebrow{text-align:center;font-size:14px;color:var(--muted);font-weight:700}
-    .value{text-align:center;font-size:clamp(56px,16vw,92px);line-height:1;font-weight:800;letter-spacing:-.05em;margin:12px 0 6px}
-    .unit{text-align:center;font-size:16px;color:var(--muted);font-weight:700}
-    .change{text-align:center;margin-top:10px;font-size:15px;font-weight:700;min-height:20px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}.fxbox{margin-top:10px;background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:14px}.fxright{text-align:right}.compare{font-size:13px;font-weight:800;margin-top:5px}
-    .box{background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:14px}
-    .label{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:7px}
-    .price{font-size:23px;font-weight:800}
-    .sub{font-size:12px;color:var(--muted);margin-top:4px}
-    .session{font-size:11px;margin-top:6px;color:var(--accent);font-weight:700}
-    .formula{margin-top:12px;padding:14px;background:#0d1218;border:1px solid var(--line);border-radius:14px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px}
-    .meta{display:flex;justify-content:space-between;gap:12px;margin:12px 2px 0;color:var(--muted);font-size:12px}
-    .statusDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#7c8797;margin-right:6px;vertical-align:1px}
-    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-    button{appearance:none;border:1px solid var(--line);background:#151d27;color:var(--text);border-radius:14px;padding:13px 12px;font-size:15px;font-weight:750}
-    .primary{background:#eaf2ff;color:#0b1728;border-color:#eaf2ff}
-    .panel{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
-    .panel h2{font-size:15px;margin:0 0 12px}
-    .manual{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .field label{display:block;color:var(--muted);font-size:12px;font-weight:700;margin:0 0 6px}
-    input{width:100%;border:1px solid var(--line);background:#0d1218;color:var(--text);border-radius:12px;padding:12px;font-size:16px}
-    .note{color:var(--muted);font-size:12px;line-height:1.55;margin-top:12px}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<title>닉스환율 지표추적자 v2</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif}
+.wrap{width:min(720px,100%);margin:auto;padding:16px 12px 40px}.top{font-size:15px;color:var(--muted);font-weight:800;margin:6px 4px 12px}
+.card{background:linear-gradient(180deg,#171e27,#11171f);border:1px solid var(--line);border-radius:22px;padding:24px 18px;margin-bottom:12px}
+.eyebrow{text-align:center;color:var(--muted);font-weight:800;font-size:14px}.big{text-align:center;font-size:clamp(58px,16vw,92px);font-weight:850;letter-spacing:-.055em;line-height:1;margin:12px 0 5px}.unit{text-align:center;color:var(--muted);font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:20px}.box,.fx{background:var(--card2);border:1px solid var(--line);border-radius:15px;padding:13px}.label{font-size:12px;color:var(--muted);font-weight:750}.price{font-size:22px;font-weight:850;margin-top:5px}.session{font-size:11px;color:var(--accent);font-weight:750;margin-top:5px}
+.fx{margin-top:9px;display:flex;justify-content:space-between;gap:10px}.right{text-align:right}.diff{font-weight:800;margin-top:5px}.formula{background:#0d1218;border:1px solid var(--line);border-radius:13px;padding:13px;text-align:center;margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.meta{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin:10px 2px}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#7c8797;margin-right:5px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}button{border:1px solid var(--line);background:#151d27;color:var(--text);border-radius:12px;padding:11px;font-weight:750}.primary,.ranges button.active{background:#eaf2ff;color:#0b1728;border-color:#eaf2ff}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:15px;margin-bottom:12px}.panel h2{font-size:15px;margin:0 0 11px}.ranges{display:flex;gap:6px;flex-wrap:wrap}.ranges button{padding:7px 10px;font-size:12px}.chart{height:310px;margin-top:8px}.note{color:var(--muted);font-size:11px;line-height:1.5;margin-top:8px}
+.manual{display:grid;grid-template-columns:1fr 1fr;gap:8px}label{display:block;color:var(--muted);font-size:11px;font-weight:700;margin-bottom:5px}input{width:100%;background:#0d1218;color:white;border:1px solid var(--line);border-radius:11px;padding:11px;font-size:15px}
+</style>
 </head>
-<body>
-<main class="wrap">
-  <div class="title">SK hynix Korea / ADR</div>
-  <section class="hero">
-    <div class="eyebrow">닉스 환율</div>
-    <div class="value" id="result">--</div>
-    <div class="unit">KRW / ADR</div>
-    <div class="change" id="change"></div>
+<body><main class="wrap">
+<div class="top">닉스환율 지표추적자 v2 · SK hynix Korea / ADR</div>
+<section class="card">
+<div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
+<div class="grid">
+ <div class="box"><div class="label">🇰🇷 SK하이닉스 · 000660</div><div class="price" id="kr">--</div><div class="session" id="ks">--</div></div>
+ <div class="box"><div class="label">🇺🇸 SKHY · NASDAQ</div><div class="price" id="us">--</div><div class="session" id="uss">--</div></div>
+</div>
+<div class="fx"><div><div class="label">💱 USD/KRW</div><div class="price" id="fx">--</div></div><div class="right"><div class="label">닉스환율 − USD/KRW</div><div class="diff" id="diff">--</div></div></div>
+<div class="formula" id="formula">0.1 × -- ÷ --</div>
+<div class="meta"><div><span class="dot" id="dot"></span><span id="status">조회 대기</span></div><div id="updated">--</div></div>
+<div class="actions"><button class="primary" id="refresh">지금 새로고침</button><button id="copy">게시판용 문구 복사</button></div>
+</section>
 
-    <div class="grid">
-      <div class="box">
-        <div class="label">🇰🇷 SK하이닉스 · 000660</div>
-        <div class="price" id="krPrice">--</div>
-        <div class="sub">KRW</div>
-        <div class="session" id="krSession">--</div>
-      </div>
-      <div class="box">
-        <div class="label">🇺🇸 SKHY · NASDAQ</div>
-        <div class="price" id="usPrice">--</div>
-        <div class="sub">USD</div>
-        <div class="session" id="usSession">--</div>
-      </div>
-    </div>
+<section class="panel"><h2>닉스환율 추이</h2>
+<div class="ranges"><button data-r="1h">1시간</button><button data-r="1d" class="active">오늘</button><button data-r="5d">5일</button><button data-r="1mo">1개월</button></div>
+<div class="chart"><canvas id="chart"></canvas></div>
+<div class="note">닉스환율과 실제 USD/KRW를 같은 축에서 비교합니다. 한국·미국 시장 거래시간이 다르므로 과거 닉스환율은 각 시점에서 이용 가능한 최신 가격을 이어서 계산한 참고지표입니다.</div>
+</section>
 
-    <div class="fxbox">
-      <div>
-        <div class="label">💱 원/달러 환율 · USD/KRW</div>
-        <div class="price" id="fxPrice">--</div>
-        <div class="sub">KRW per USD</div>
-      </div>
-      <div class="fxright">
-        <div class="label">닉스 환율 − 원/달러</div>
-        <div class="compare" id="fxDiff">--</div>
-      </div>
-    </div>
-
-    <div class="formula" id="formula">0.1 × -- ÷ --</div>
-
-    <div class="meta">
-      <div><span class="statusDot" id="dot"></span><span id="status">시세 조회 대기</span></div>
-      <div id="updated">--</div>
-    </div>
-
-    <div class="actions">
-      <button class="primary" id="refreshBtn">지금 새로고침</button>
-      <button id="copyBtn">게시판용 문구 복사</button>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2>수동 입력 · 자동 조회 실패 시</h2>
-    <div class="manual">
-      <div class="field">
-        <label>한국 주가 (원)</label>
-        <input id="manualKr" inputmode="decimal" placeholder="예: 1400000" />
-      </div>
-      <div class="field">
-        <label>SKHY 가격 ($)</label>
-        <input id="manualUs" inputmode="decimal" placeholder="예: 140" />
-      </div>
-    </div>
-    <div class="actions">
-      <button id="manualCalc">수동값으로 계산</button>
-      <button id="autoMode">자동 조회로 복귀</button>
-    </div>
-    <div class="note">
-      미국 SKHY는 <b>프리마켓·정규장·애프터마켓을 포함한 가장 최근 1분봉 체결값</b>을 우선 사용합니다. 비교용으로 <b>USD/KRW 원·달러 환율</b>도 함께 조회합니다.
-      한국 000660도 가능한 가장 최근 1분봉을 사용합니다. 무료 Yahoo Finance 데이터와 공개 프록시는 지연되거나 일시적으로 실패할 수 있습니다.
-    </div>
-  </section>
+<section class="panel"><h2>수동 입력</h2><div class="manual">
+<div><label>한국 주가 (원)</label><input id="mkr" inputmode="decimal" placeholder="1400000"></div>
+<div><label>SKHY ($)</label><input id="mus" inputmode="decimal" placeholder="140"></div></div>
+<div class="actions"><button id="calc">수동 계산</button><button id="auto">자동 조회 복귀</button></div>
+</section>
 </main>
-
 <script>
-const REFRESH_MS = 15000;
-const YAHOO = symbol => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d&includePrePost=true&events=div%2Csplits`;
-
-let timer = null, autoMode = true, previousValue = null, lastKr = null, lastUs = null, lastFx = null;
-
-const $ = id => document.getElementById(id);
-const fmt0 = n => Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0});
-const fmt2 = n => Number(n).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
-
-function setStatus(text, ok=null){
-  $('status').textContent = text;
-  $('dot').style.background = ok===true ? '#35c98a' : ok===false ? '#ff6677' : '#7c8797';
-}
-
-function detectSession(meta, timestamp){
-  if(!timestamp) return '최근 체결';
-  const t = new Date(timestamp * 1000);
-  const tz = meta?.exchangeTimezoneName || '';
-  try{
-    const parts = new Intl.DateTimeFormat('en-US',{
-      timeZone: tz || 'UTC', hour:'2-digit', minute:'2-digit', hour12:false, weekday:'short'
-    }).formatToParts(t);
-    const vals = Object.fromEntries(parts.map(p=>[p.type,p.value]));
-    const hm = Number(vals.hour)*60 + Number(vals.minute);
-    if(meta?.exchangeName?.includes('NMS') || meta?.symbol === 'SKHY'){
-      if(hm < 570) return '프리마켓';
-      if(hm < 960) return '정규장';
-      return '애프터마켓';
-    } else {
-      if(hm >= 540 && hm < 930) return '정규장';
-      return '장 마감 / 최근가';
-    }
-  } catch {
-    return '최근 체결';
-  }
-}
-
-function extractLatest(payload){
-  const r = payload?.chart?.result?.[0];
-  if(!r) throw new Error('시세 데이터 없음');
-
-  const ts = r.timestamp || [];
-  const closes = r.indicators?.quote?.[0]?.close || [];
-
-  // 가장 마지막 실제 1분봉 체결가를 우선 사용.
-  for(let i=closes.length-1;i>=0;i--){
-    const v = closes[i];
-    if(Number.isFinite(v) && v > 0){
-      return {
-        price: v,
-        timestamp: ts[i] || null,
-        meta: r.meta || {}
-      };
-    }
-  }
-
-  // 1분봉이 없을 때만 meta 가격 fallback.
-  const meta = r.meta || {};
-  const candidates = [meta.postMarketPrice, meta.preMarketPrice, meta.regularMarketPrice];
-  for(const v of candidates){
-    if(Number.isFinite(v) && v > 0){
-      return {price:v, timestamp:meta.regularMarketTime || null, meta};
-    }
-  }
-
-  throw new Error('유효한 현재가 없음');
-}
-
-async function fetchJsonWithFallback(url){
-  const tries = [
-    async () => fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {cache:'no-store'}),
-    async () => fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, {cache:'no-store'}),
-    async () => fetch(url, {cache:'no-store'})
-  ];
-
-  let lastErr;
-  for(const fn of tries){
-    try{
-      const res = await fn();
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch(e){ lastErr=e; }
-  }
-  throw lastErr || new Error('시세 요청 실패');
-}
-
-function render(krObj, usObj, fxObj=null, source='AUTO'){
-  const kr = krObj.price, us = usObj.price;
-  const value = 0.1 * kr / us;
-  lastKr = kr; lastUs = us;
-  if(fxObj && fxObj.price>0) lastFx = fxObj.price;
-
-  $('krPrice').textContent = fmt0(kr);
-  $('usPrice').textContent = '$' + fmt2(us);
-  $('result').textContent = fmt2(value);
-  $('formula').textContent = `0.1 × ${fmt0(kr)} ÷ ${fmt2(us)} = ${fmt2(value)}`;
-
-  if(lastFx && lastFx>0){
-    $('fxPrice').textContent = fmt2(lastFx);
-    const d = value - lastFx;
-    const pct = d / lastFx * 100;
-    $('fxDiff').textContent = `${d>=0?'+':''}${fmt2(d)} (${pct>=0?'+':''}${pct.toFixed(2)}%)`;
-    $('fxDiff').style.color = d > 0 ? '#35c98a' : d < 0 ? '#ff6677' : '#95a1b2';
-  } else {
-    $('fxPrice').textContent = '--';
-    $('fxDiff').textContent = '--';
-  }
-
-  $('krSession').textContent = source==='AUTO' ? detectSession(krObj.meta, krObj.timestamp) : '수동 입력';
-  $('usSession').textContent = source==='AUTO' ? detectSession(usObj.meta, usObj.timestamp) : '수동 입력';
-
-  if(previousValue !== null && source === 'AUTO'){
-    const diff = value - previousValue;
-    const pct = previousValue ? diff / previousValue * 100 : 0;
-    const sign = diff > 0 ? '▲' : diff < 0 ? '▼' : '•';
-    $('change').textContent = `${sign} ${diff>=0?'+':''}${fmt2(diff)}  (${pct>=0?'+':''}${pct.toFixed(2)}%)`;
-    $('change').style.color = diff > 0 ? '#35c98a' : diff < 0 ? '#ff6677' : '#95a1b2';
-  } else if(source === 'MANUAL'){
-    $('change').textContent = '수동 입력값';
-    $('change').style.color = '#95a1b2';
-  }
-
-  previousValue = value;
-  $('updated').textContent = new Date().toLocaleTimeString('ko-KR',{hour12:false});
-}
-
-async function updateAuto(){
-  if(!autoMode) return;
-  setStatus('시세 조회 중…', null);
-  try{
-    const [krJson, usJson, fxJson] = await Promise.all([
-      fetchJsonWithFallback(YAHOO('000660.KS')),
-      fetchJsonWithFallback(YAHOO('SKHY')),
-      fetchJsonWithFallback(YAHOO('USDKRW=X'))
-    ]);
-    render(extractLatest(krJson), extractLatest(usJson), extractLatest(fxJson), 'AUTO');
-    setStatus('최근 체결가 반영', true);
-  } catch(e){
-    console.error(e);
-    setStatus('자동 조회 실패 · 수동 입력 가능', false);
-  }
-}
-
-$('refreshBtn').addEventListener('click', ()=>{ autoMode=true; updateAuto(); });
-
-$('manualCalc').addEventListener('click', ()=>{
-  const kr = Number(($('manualKr').value||'').replaceAll(',',''));
-  const us = Number(($('manualUs').value||'').replaceAll(',',''));
-  if(!(kr>0) || !(us>0)){ alert('두 가격을 모두 입력해 주세요.'); return; }
-  autoMode=false;
-  render({price:kr},{price:us}, lastFx ? {price:lastFx} : null, 'MANUAL');
-  setStatus('수동 입력', null);
-});
-
-$('autoMode').addEventListener('click', ()=>{ autoMode=true; $('change').textContent=''; updateAuto(); });
-
-$('copyBtn').addEventListener('click', async ()=>{
-  if(!(lastKr>0) || !(lastUs>0)){ alert('먼저 시세를 불러와 주세요.'); return; }
-  const value = 0.1 * lastKr / lastUs;
-  const text =
-`닉스 환율: ${fmt2(value)}
-
-한국 SK하이닉스: ${fmt0(lastKr)}원
-SKHY ADR: $${fmt2(lastUs)}
-
-0.1 × ${fmt0(lastKr)} ÷ ${fmt2(lastUs)} = ${fmt2(value)}`;
-  try{
-    await navigator.clipboard.writeText(text);
-    const old=$('copyBtn').textContent;
-    $('copyBtn').textContent='복사 완료';
-    setTimeout(()=>$('copyBtn').textContent=old,1200);
-  }catch{
-    prompt('아래 문구를 복사하세요.', text);
-  }
-});
-
-updateAuto();
-timer = setInterval(updateAuto, REFRESH_MS);
-</script>
-</body>
-</html>
+const REFRESH=15000, $=x=>document.getElementById(x);
+const Y=(s,interval='1m',range='1d')=>`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?interval=${interval}&range=${range}&includePrePost=true`;
+let auto=true, prev=null, last={}, chart=null, range='1d';
+let live=JSON.parse(localStorage.getItem('nyxLive')||'[]');
+const f0=n=>Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0});
+const f2=n=>Number(n).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
+function status(t,ok){$('status').textContent=t;$('dot').style.background=ok===true?'#35c98a':ok===false?'#ff6677':'#7c8797'}
+async function get(url){let e;for(const u of [`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,`https://corsproxy.io/?url=${encodeURIComponent(url)}`,url]){try{const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw Error(r.status);return await r.json()}catch(x){e=x}}throw e}
+function series(j){const r=j?.chart?.result?.[0],a=[];if(!r)return a;const ts=r.timestamp||[],c=r.indicators?.quote?.[0]?.close||[];for(let i=0;i<ts.length;i++)if(Number.isFinite(c[i])&&c[i]>0)a.push({t:ts[i]*1000,v:c[i]});return a}
+function latest(j){const r=j?.chart?.result?.[0],s=series(j);if(s.length)return {...s.at(-1),meta:r.meta||{}};const v=r?.meta?.regularMarketPrice;if(v)return{t:(r.meta.regularMarketTime||0)*1000,v,meta:r.meta};throw Error('price')}
+function sess(o,us=false){if(!o?.t)return'최근가';const tz=o.meta?.exchangeTimezoneName||'UTC';try{const z=new Intl.DateTimeFormat('en-US',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date(o.t));const q=Object.fromEntries(z.map(x=>[x.type,x.value]));const m=+q.hour*60 + +q.minute;if(us)return m<570?'프리마켓':m<960?'정규장':'애프터마켓';return m>=540&&m<930?'정규장':'장 마감 / 최근가'}catch{return'최근가'}}
+function draw(k,u,x,manual=false){const n=.1*k.v/u.v;last={k:k.v,u:u.v,x:x?.v,n};$('result').textContent=f2(n);$('kr').textContent=f0(k.v)+'원';$('us').textContent='$'+f2(u.v);$('ks').textContent=manual?'수동 입력':sess(k);$('uss').textContent=manual?'수동 입력':sess(u,true);$('formula').textContent=`0.1 × ${f0(k.v)} ÷ ${f2(u.v)} = ${f2(n)}`;if(x?.v){$('fx').textContent=f2(x.v);const d=n-x.v,p=d/x.v*100;$('diff').textContent=`${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)`;$('diff').style.color=d>0?'#35c98a':d<0?'#ff6677':'#95a1b2'}$('updated').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});prev=n;return n}
+function save(n,x){live.push({t:Date.now(),n,x});const cut=Date.now()-31*864e5;live=live.filter(p=>p.t>cut).slice(-12000);localStorage.setItem('nyxLive',JSON.stringify(live))}
+function ms(){return range==='1h'?36e5:range==='1d'?864e5:range==='5d'?5*864e5:31*864e5}
+function renderChart(p){if(typeof Chart==='undefined')return;if(chart)chart.destroy();chart=new Chart($('chart'),{type:'line',data:{labels:p.map(q=>new Date(q.t).toLocaleString('ko-KR',range==='1h'||range==='1d'?{hour:'2-digit',minute:'2-digit',hour12:false}:{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})),datasets:[{label:'닉스환율',data:p.map(q=>q.n),borderWidth:2,pointRadius:0,tension:.15,spanGaps:true},{label:'USD/KRW',data:p.map(q=>q.x),borderWidth:1.5,pointRadius:0,tension:.15,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cbd5e1'}}},scales:{x:{ticks:{color:'#95a1b2',maxTicksLimit:7},grid:{color:'rgba(149,161,178,.08)'}},y:{ticks:{color:'#95a1b2'},grid:{color:'rgba(149,161,178,.1)'}}}}})}
+async function history(){try{status('차트 조회 중…');const int=range==='1mo'?'30m':range==='5d'?'15m':'5m',rg=range==='1h'?'1d':range;const [a,b,c]=await Promise.all([get(Y('000660.KS',int,rg)),get(Y('SKHY',int,rg)),get(Y('USDKRW=X',int,rg))]);const K=series(a),U=series(b),X=series(c),cut=Date.now()-ms();let ki=-1,ui=-1,xi=-1;const times=[...new Set([...K,...U,...X].map(z=>z.t).filter(t=>t>=cut))].sort((a,b)=>a-b),p=[];for(const t of times){while(ki+1<K.length&&K[ki+1].t<=t)ki++;while(ui+1<U.length&&U[ui+1].t<=t)ui++;while(xi+1<X.length&&X[xi+1].t<=t)xi++;if(ki>=0&&ui>=0)p.push({t,n:.1*K[ki].v/U[ui].v,x:xi>=0?X[xi].v:null})}const newest=p.at(-1)?.t||0;live.filter(q=>q.t>newest&&q.t>=cut).forEach(q=>p.push(q));renderChart(p);status('최근 체결가 반영',true)}catch(e){console.error(e);renderChart(live.filter(p=>p.t>Date.now()-ms()));status('과거차트 일부 제한',false)}}
+async function update(){if(!auto)return;try{status('시세 조회 중…');const[a,b,c]=await Promise.all([get(Y('000660.KS')),get(Y('SKHY')),get(Y('USDKRW=X'))]);const k=latest(a),u=latest(b),x=latest(c),n=draw(k,u,x);save(n,x.v);status('최근 체결가 반영',true)}catch(e){console.error(e);status('자동조회 실패 · 수동입력 가능',false)}}
+document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;history()});
+$('refresh').onclick=()=>{auto=true;update();history()};$('auto').onclick=()=>{auto=true;update();history()};
+$('calc').onclick=()=>{const k=+$('mkr').value.replaceAll(',',''),u=+$('mus').value.replaceAll(',','');if(!(k>0&&u>0))return alert('두 가격을 입력해 주세요.');auto=false;draw({v:k},{v:u},last.x?{v:last.x}:null,true);status('수동 입력')};
+$('copy').onclick=async()=>{if(!last.n)return;const d=last.x?last.n-last.x:null,p=last.x?d/last.x*100:null;const t=`닉스 환율: ${f2(last.n)}\n한국 SK하이닉스: ${f0(last.k)}원\nSKHY: $${f2(last.u)}\n${last.x?`USD/KRW: ${f2(last.x)}\n괴리: ${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)\n`:''}\n0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
+update();history();setInterval(update,REFRESH);
+</script></body></html>
