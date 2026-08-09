@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0f14" />
+  <title>SK hynix ADR 환산값</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --card:#141a22; --card2:#10151c; --text:#f5f7fa;
+      --muted:#95a1b2; --line:#26303d; --good:#35c98a; --bad:#ff6677; --accent:#6aa7ff;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR",Arial,sans-serif}
+    body{min-height:100vh}
+    .wrap{width:min(680px,100%);margin:0 auto;padding:18px 14px 44px}
+    .title{font-size:14px;color:var(--muted);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:8px 4px 12px}
+    .hero{background:linear-gradient(180deg,#171e27,#11171f);border:1px solid var(--line);border-radius:24px;padding:28px 20px 22px;box-shadow:0 16px 50px rgba(0,0,0,.25)}
+    .eyebrow{text-align:center;font-size:14px;color:var(--muted);font-weight:700}
+    .value{text-align:center;font-size:clamp(56px,16vw,92px);line-height:1;font-weight:800;letter-spacing:-.05em;margin:12px 0 6px}
+    .unit{text-align:center;font-size:16px;color:var(--muted);font-weight:700}
+    .change{text-align:center;margin-top:10px;font-size:15px;font-weight:700;min-height:20px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+    .box{background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:14px}
+    .label{font-size:12px;color:var(--muted);font-weight:700;margin-bottom:7px}
+    .price{font-size:23px;font-weight:800;letter-spacing:-.02em}
+    .sub{font-size:12px;color:var(--muted);margin-top:4px}
+    .formula{margin-top:12px;padding:14px;background:#0d1218;border:1px solid var(--line);border-radius:14px;text-align:center;color:#dfe6ef;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;overflow-wrap:anywhere}
+    .meta{display:flex;justify-content:space-between;gap:12px;margin:12px 2px 0;color:var(--muted);font-size:12px}
+    .statusDot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#7c8797;margin-right:6px;vertical-align:1px}
+    .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+    button{appearance:none;border:1px solid var(--line);background:#151d27;color:var(--text);border-radius:14px;padding:13px 12px;font-size:15px;font-weight:750}
+    button:active{transform:scale(.985)}
+    .primary{background:#eaf2ff;color:#0b1728;border-color:#eaf2ff}
+    .panel{margin-top:14px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px}
+    .panel h2{font-size:15px;margin:0 0 12px}
+    .manual{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .field label{display:block;color:var(--muted);font-size:12px;font-weight:700;margin:0 0 6px}
+    input{width:100%;border:1px solid var(--line);background:#0d1218;color:var(--text);border-radius:12px;padding:12px;font-size:16px;outline:none}
+    input:focus{border-color:var(--accent)}
+    .note{color:var(--muted);font-size:12px;line-height:1.55;margin-top:12px}
+    .error{color:#ffc2c9}
+    @media(max-width:430px){
+      .value{font-size:64px}
+      .price{font-size:20px}
+      .wrap{padding-left:10px;padding-right:10px}
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="title">SK hynix Korea / ADR</div>
+
+    <section class="hero">
+      <div class="eyebrow">하이닉스 ADR 환산값</div>
+      <div class="value" id="result">--</div>
+      <div class="unit">KRW / ADR</div>
+      <div class="change" id="change"></div>
+
+      <div class="grid">
+        <div class="box">
+          <div class="label">🇰🇷 SK하이닉스 · 000660</div>
+          <div class="price" id="krPrice">--</div>
+          <div class="sub">KRW</div>
+        </div>
+        <div class="box">
+          <div class="label">🇺🇸 SKHY · NASDAQ</div>
+          <div class="price" id="usPrice">--</div>
+          <div class="sub">USD</div>
+        </div>
+      </div>
+
+      <div class="formula" id="formula">0.1 × -- ÷ --</div>
+
+      <div class="meta">
+        <div><span class="statusDot" id="dot"></span><span id="status">시세 조회 대기</span></div>
+        <div id="updated">--</div>
+      </div>
+
+      <div class="actions">
+        <button class="primary" id="refreshBtn">지금 새로고침</button>
+        <button id="copyBtn">게시판용 문구 복사</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>수동 입력 · 자동 조회 실패 시 사용</h2>
+      <div class="manual">
+        <div class="field">
+          <label>한국 주가 (원)</label>
+          <input id="manualKr" inputmode="decimal" placeholder="예: 1400000" />
+        </div>
+        <div class="field">
+          <label>SKHY 가격 ($)</label>
+          <input id="manualUs" inputmode="decimal" placeholder="예: 140" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="manualCalc">수동값으로 계산</button>
+        <button id="autoMode">자동 조회로 복귀</button>
+      </div>
+      <div class="note">
+        계산식: <b>0.1 × 한국 SK하이닉스 주가 ÷ SKHY ADR 가격</b><br>
+        자동 모드는 Yahoo Finance의 공개 시세 응답을 사용하며, 브라우저 CORS 제한 때문에 공개 프록시를 순차적으로 시도합니다.
+        무료 데이터/프록시는 지연되거나 일시적으로 실패할 수 있습니다.
+      </div>
+    </section>
+  </main>
+
+<script>
+const REFRESH_MS = 15000;
+const YAHOO = symbol => `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1m&range=1d&includePrePost=true`;
+
+let timer = null;
+let autoMode = true;
+let previousValue = null;
+let lastKr = null;
+let lastUs = null;
+
+const $ = id => document.getElementById(id);
+const fmt0 = n => Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0});
+const fmt2 = n => Number(n).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function setStatus(text, ok=null){
+  $('status').textContent = text;
+  $('dot').style.background = ok===true ? '#35c98a' : ok===false ? '#ff6677' : '#7c8797';
+}
+
+function extractPrice(payload){
+  const r = payload?.chart?.result?.[0];
+  if(!r) throw new Error('시세 데이터 없음');
+  const meta = r.meta || {};
+  if(Number.isFinite(meta.regularMarketPrice) && meta.regularMarketPrice > 0) return meta.regularMarketPrice;
+  const closes = r.indicators?.quote?.[0]?.close || [];
+  for(let i=closes.length-1;i>=0;i--){
+    if(Number.isFinite(closes[i]) && closes[i] > 0) return closes[i];
+  }
+  throw new Error('유효한 현재가 없음');
+}
+
+async function fetchJsonWithFallback(url){
+  const tries = [
+    async () => fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {cache:'no-store'}),
+    async () => fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, {cache:'no-store'}),
+    async () => fetch(url, {cache:'no-store'})
+  ];
+
+  let lastErr;
+  for(const fn of tries){
+    try{
+      const res = await fn();
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }catch(e){
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('모든 시세 경로 실패');
+}
+
+function render(kr, us, source='AUTO'){
+  const value = 0.1 * kr / us;
+  lastKr = kr; lastUs = us;
+
+  $('krPrice').textContent = fmt0(kr);
+  $('usPrice').textContent = '$' + fmt2(us);
+  $('result').textContent = fmt2(value);
+  $('formula').textContent = `0.1 × ${fmt0(kr)} ÷ ${fmt2(us)} = ${fmt2(value)}`;
+
+  if(previousValue !== null && source === 'AUTO'){
+    const diff = value - previousValue;
+    const pct = previousValue ? diff / previousValue * 100 : 0;
+    const sign = diff > 0 ? '▲' : diff < 0 ? '▼' : '•';
+    $('change').textContent = `${sign} ${diff>=0?'+':''}${fmt2(diff)}  (${pct>=0?'+':''}${pct.toFixed(2)}%)`;
+    $('change').style.color = diff > 0 ? '#35c98a' : diff < 0 ? '#ff6677' : '#95a1b2';
+  } else if(source === 'MANUAL'){
+    $('change').textContent = '수동 입력값';
+    $('change').style.color = '#95a1b2';
+  }
+
+  previousValue = value;
+  $('updated').textContent = new Date().toLocaleTimeString('ko-KR',{hour12:false});
+}
+
+async function updateAuto(){
+  if(!autoMode) return;
+  setStatus('시세 조회 중…', null);
+  try{
+    const [krJson, usJson] = await Promise.all([
+      fetchJsonWithFallback(YAHOO('000660.KS')),
+      fetchJsonWithFallback(YAHOO('SKHY'))
+    ]);
+    const kr = extractPrice(krJson);
+    const us = extractPrice(usJson);
+    render(kr, us, 'AUTO');
+    setStatus('자동 시세', true);
+  }catch(e){
+    console.error(e);
+    setStatus('자동 조회 실패 · 수동 입력 가능', false);
+    $('status').classList.add('error');
+  }
+}
+
+function startTimer(){
+  clearInterval(timer);
+  timer = setInterval(updateAuto, REFRESH_MS);
+}
+
+$('refreshBtn').addEventListener('click', () => {
+  autoMode = true;
+  updateAuto();
+});
+
+$('manualCalc').addEventListener('click', () => {
+  const kr = Number(($('manualKr').value || '').replaceAll(',',''));
+  const us = Number(($('manualUs').value || '').replaceAll(',',''));
+  if(!(kr>0) || !(us>0)){
+    alert('한국 주가와 SKHY 가격을 모두 숫자로 입력해 주세요.');
+    return;
+  }
+  autoMode = false;
+  render(kr, us, 'MANUAL');
+  setStatus('수동 입력', null);
+});
+
+$('autoMode').addEventListener('click', () => {
+  autoMode = true;
+  $('change').textContent = '';
+  updateAuto();
+});
+
+$('copyBtn').addEventListener('click', async () => {
+  if(!(lastKr>0) || !(lastUs>0)){
+    alert('먼저 시세를 불러오거나 수동 입력으로 계산해 주세요.');
+    return;
+  }
+  const value = 0.1 * lastKr / lastUs;
+  const text =
+`SK하이닉스 ADR 환산값: ${fmt2(value)}
+
+한국 SK하이닉스: ${fmt0(lastKr)}원
+SKHY ADR: $${fmt2(lastUs)}
+
+0.1 × ${fmt0(lastKr)} ÷ ${fmt2(lastUs)} = ${fmt2(value)}`;
+  try{
+    await navigator.clipboard.writeText(text);
+    const old = $('copyBtn').textContent;
+    $('copyBtn').textContent = '복사 완료';
+    setTimeout(()=>$('copyBtn').textContent=old,1200);
+  }catch(e){
+    prompt('아래 문구를 복사하세요.', text);
+  }
+});
+
+updateAuto();
+startTimer();
+</script>
+</body>
+</html>
