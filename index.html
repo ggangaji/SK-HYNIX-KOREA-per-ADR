@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v2.4</title>
+<title>닉스환율 지표추적자 v0.5</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -21,7 +21,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v2.4 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v0.5 · SK hynix Korea / ADR</div>
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
 <div class="grid">
@@ -36,7 +36,10 @@
 
 <section class="panel"><h2>닉스환율 추이</h2>
 <div class="ranges"><button data-r="1h">1시간</button><button data-r="1d" class="active">오늘</button><button data-r="5d">5일</button><button data-r="1mo">1개월</button></div>
-<div class="chart"><canvas id="chart"></canvas></div>
+<div class="chart"><canvas id="chart"></canvas></div><div id="corrPanel" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:end;gap:12px">
+<div><div style="font-weight:800">닉스환율 ↔ USD/KRW</div><div class="note" style="margin-top:3px">10거래일 Rolling Correlation · 가격 레벨</div></div>
+<div style="text-align:right"><div id="corr10" style="font-size:25px;font-weight:900">—</div><div id="corr10txt" class="note" style="margin-top:1px">계산 중</div></div>
+</div>
 <div class="note">SKHY 현재값은 Cloudflare Worker의 Yahoo WebSocket(BOATS/Overnight)을 우선 사용하고, 실패하면 Yahoo 프리/정규/애프터 가격으로 자동 전환합니다. 닉스환율과 실제 USD/KRW를 같은 축에서 비교합니다. 한국·미국 시장 거래시간이 다르므로 과거 닉스환율은 각 시점에서 이용 가능한 최신 가격을 이어서 계산한 참고지표입니다.</div>
 </section>
 
@@ -63,7 +66,21 @@ function draw(k,u,x,manual=false){const n=.1*k.v/u.v;last={k:k.v,u:u.v,x:x?.v,n}
 function save(n,x){live.push({t:Date.now(),n,x});const cut=Date.now()-31*864e5;live=live.filter(p=>p.t>cut).slice(-12000);localStorage.setItem('nyxLive',JSON.stringify(live))}
 function ms(){return range==='1h'?36e5:range==='1d'?864e5:range==='5d'?5*864e5:31*864e5}
 function renderChart(p){if(typeof Chart==='undefined')return;if(chart)chart.destroy();chart=new Chart($('chart'),{type:'line',data:{labels:p.map(q=>new Date(q.t).toLocaleString('ko-KR',range==='1h'||range==='1d'?{hour:'2-digit',minute:'2-digit',hour12:false}:{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})),datasets:[{label:'닉스환율',data:p.map(q=>q.n),borderWidth:2,pointRadius:0,tension:.15,spanGaps:true},{label:'USD/KRW',data:p.map(q=>q.x),borderWidth:1.5,pointRadius:0,tension:.15,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cbd5e1'}}},scales:{x:{ticks:{color:'#95a1b2',maxTicksLimit:7},grid:{color:'rgba(149,161,178,.08)'}},y:{ticks:{color:'#95a1b2'},grid:{color:'rgba(149,161,178,.1)'}}}}})}
-async function history(){try{status('차트 조회 중…');const int=range==='1mo'?'30m':range==='5d'?'15m':'5m',rg=range==='1h'?'1d':range;const [a,b,c]=await Promise.all([get(Y('000660.KS',int,rg)),get(Y('SKHY',int,rg)),get(Y('USDKRW=X',int,rg))]);const K=series(a),U=series(b),X=series(c),cut=Date.now()-ms();let ki=-1,ui=-1,xi=-1;const times=[...new Set([...K,...U,...X].map(z=>z.t).filter(t=>t>=cut))].sort((a,b)=>a-b),p=[];for(const t of times){while(ki+1<K.length&&K[ki+1].t<=t)ki++;while(ui+1<U.length&&U[ui+1].t<=t)ui++;while(xi+1<X.length&&X[xi+1].t<=t)xi++;if(ki>=0&&ui>=0)p.push({t,n:.1*K[ki].v/U[ui].v,x:xi>=0?X[xi].v:null})}const newest=p.at(-1)?.t||0;live.filter(q=>q.t>newest&&q.t>=cut).forEach(q=>p.push(q));renderChart(p);status('최근 체결가 반영',true)}catch(e){console.error(e);renderChart(live.filter(p=>p.t>Date.now()-ms()));status('과거차트 일부 제한',false)}}
+
+function pearson(a,b){if(a.length!==b.length||a.length<2)return null;const ma=a.reduce((s,v)=>s+v,0)/a.length,mb=b.reduce((s,v)=>s+v,0)/b.length;let num=0,da=0,db=0;for(let i=0;i<a.length;i++){const x=a[i]-ma,y=b[i]-mb;num+=x*y;da+=x*x;db+=y*y}const den=Math.sqrt(da*db);return den?num/den:null}
+function corrText(r){const a=Math.abs(r);if(a>=.7)return r>=0?'강한 동행':'강한 역행';if(a>=.3)return r>=0?'양의 상관':'음의 상관';return'뚜렷한 관계 없음'}
+function showCorr(p){
+ const el=$('corr10'),tx=$('corr10txt'); if(!el||!tx)return;
+ const daily=new Map();
+ for(const v of p){if(Number.isFinite(v.n)&&Number.isFinite(v.x)){const d=new Date(v.t).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});daily.set(d,v)}}
+ const d=[...daily.values()].sort((a,b)=>a.t-b.t).slice(-10);
+ if(d.length<5){el.textContent='—';tx.textContent=`데이터 ${d.length}/10일`;return}
+ const r=pearson(d.map(v=>v.n),d.map(v=>v.x));
+ if(r==null){el.textContent='—';tx.textContent='계산 불가';return}
+ el.textContent=(r>=0?'+':'')+r.toFixed(2);tx.textContent=`${corrText(r)} · ${d.length}거래일`;
+}
+
+async function history(){try{status('차트 조회 중…');const int=range==='1mo'?'30m':range==='5d'?'15m':'5m',rg=range==='1h'?'1d':range;const [a,b,c]=await Promise.all([get(Y('000660.KS',int,rg)),get(Y('SKHY',int,rg)),get(Y('USDKRW=X',int,rg))]);const K=series(a),U=series(b),X=series(c),cut=Date.now()-ms();let ki=-1,ui=-1,xi=-1;const times=[...new Set([...K,...U,...X].map(z=>z.t).filter(t=>t>=cut))].sort((a,b)=>a-b),p=[];for(const t of times){while(ki+1<K.length&&K[ki+1].t<=t)ki++;while(ui+1<U.length&&U[ui+1].t<=t)ui++;while(xi+1<X.length&&X[xi+1].t<=t)xi++;if(ki>=0&&ui>=0)p.push({t,n:.1*K[ki].v/U[ui].v,x:xi>=0?X[xi].v:null})}const newest=p.at(-1)?.t||0;live.filter(q=>q.t>newest&&q.t>=cut).forEach(q=>p.push(q));renderChart(p);showCorr(p);status('최근 체결가 반영',true)}catch(e){console.error(e);const fp=live.filter(p=>p.t>Date.now()-ms()).map(q=>({t:q.t,n:q.n,x:q.x}));renderChart(fp);showCorr(fp);status('과거차트 일부 제한',false)}}
 
 async function getSkhyFromWorker(){
   const controller = new AbortController();
