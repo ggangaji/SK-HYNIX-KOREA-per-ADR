@@ -110,7 +110,7 @@ function showCorr(p){
  const daily=new Map();
  for(const v of p){
    if(Number.isFinite(v.n)&&Number.isFinite(v.x)){
-     const key=v.date||new Date(v.t).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+     const key=new Date(v.t).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
      daily.set(key,v);
    }
  }
@@ -183,39 +183,26 @@ function showCorr(p){
 
 function dateKeyKST(t){
   return new Intl.DateTimeFormat('sv-SE',{
-    timeZone:'Asia/Seoul',
-    year:'numeric',month:'2-digit',day:'2-digit'
+    timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'
   }).format(new Date(t));
 }
-function toDailyMap(points){
+function dailyLast(points){
   const m=new Map();
   for(const p of points){
-    if(Number.isFinite(p.t)&&Number.isFinite(p.v)){
-      m.set(dateKeyKST(p.t),p);
-    }
+    if(Number.isFinite(p.t)&&Number.isFinite(p.v)) m.set(dateKeyKST(p.t),p);
   }
   return m;
 }
 function alignDailySeries(K,U,X){
-  const km=toDailyMap(K), um=toDailyMap(U), xm=toDailyMap(X);
+  const km=dailyLast(K), um=dailyLast(U), xm=dailyLast(X);
   const dates=[...new Set([...km.keys(),...um.keys(),...xm.keys()])].sort();
-
-  let lastK=null,lastU=null,lastX=null;
+  let k=null,u=null,x=null;
   const out=[];
-
   for(const d of dates){
-    if(km.has(d)) lastK=km.get(d);
-    if(um.has(d)) lastU=um.get(d);
-    if(xm.has(d)) lastX=xm.get(d);
-
-    if(lastK&&lastU&&lastX){
-      out.push({
-        date:d,
-        t:Math.max(lastK.t,lastU.t,lastX.t),
-        n:.1*lastK.v/lastU.v,
-        x:lastX.v
-      });
-    }
+    if(km.has(d)) k=km.get(d);
+    if(um.has(d)) u=um.get(d);
+    if(xm.has(d)) x=xm.get(d);
+    if(k&&u&&x) out.push({date:d,t:Math.max(k.t,u.t,x.t),n:.1*k.v/u.v,x:x.v});
   }
   return out;
 }
@@ -223,66 +210,39 @@ function alignDailySeries(K,U,X){
 async function loadCorrelationHistory(){
   try{
     const j=await getWorkerHistory('corr');
-    const K=workerPoints(j.korea);
-    const U=workerPoints(j.skhy);
-    const X=workerPoints(j.fx);
-
-    if(!K.length||!U.length||!X.length){
-      throw Error('Corr Worker 과거 시세 부족');
-    }
-
-    const p=alignDailySeries(K,U,X);
-    showCorr(p);
-
+    const K=workerPoints(j.korea), U=workerPoints(j.skhy), X=workerPoints(j.fx);
+    if(!K.length||!U.length||!X.length) throw Error('Corr Worker 과거 시세 부족');
+    showCorr(alignDailySeries(K,U,X));
   }catch(e){
     console.warn('Correlation Worker failed',e);
   }
 }
 
+
 async function history(){
   try{
     status('차트 조회 중…');
-
     const j=await getWorkerHistory(range);
-    const K=workerPoints(j.korea);
-    const U=workerPoints(j.skhy);
-    const X=workerPoints(j.fx);
-
-    if(!K.length||!U.length||!X.length){
-      throw Error('Worker 과거 시세 부족');
-    }
+    const K=workerPoints(j.korea), U=workerPoints(j.skhy), X=workerPoints(j.fx);
+    if(!K.length||!U.length||!X.length) throw Error('Worker 과거 시세 부족');
 
     let p=[];
-
     if(range==='1mo'){
-      // 1개월은 일봉을 한국 날짜 기준으로 정렬.
       p=alignDailySeries(K,U,X);
     }else{
       const cut=Date.now()-ms();
       let ki=-1,ui=-1,xi=-1;
-
-      const times=[...new Set(
-        [...K,...U,...X].map(z=>z.t).filter(t=>t>=cut)
-      )].sort((a,b)=>a-b);
-
+      const times=[...new Set([...K,...U,...X].map(z=>z.t).filter(t=>t>=cut))].sort((a,b)=>a-b);
       for(const t of times){
         while(ki+1<K.length&&K[ki+1].t<=t)ki++;
         while(ui+1<U.length&&U[ui+1].t<=t)ui++;
         while(xi+1<X.length&&X[xi+1].t<=t)xi++;
-
-        if(ki>=0&&ui>=0&&xi>=0){
-          p.push({t,n:.1*K[ki].v/U[ui].v,x:X[xi].v});
-        }
+        if(ki>=0&&ui>=0&&xi>=0) p.push({t,n:.1*K[ki].v/U[ui].v,x:X[xi].v});
       }
-
-      if(range==='1h'){
-        p=p.filter(q=>q.t>=Date.now()-3600000);
-      }
+      if(range==='1h') p=p.filter(q=>q.t>=Date.now()-3600000);
     }
-
     renderChart(p);
     status('과거차트 Worker 반영',true);
-
   }catch(e){
     console.error('Worker history:',e);
     status('과거차트 조회 실패',false);
