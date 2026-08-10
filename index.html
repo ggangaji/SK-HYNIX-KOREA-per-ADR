@@ -37,13 +37,23 @@
 <section class="panel"><h2>닉스환율 추이</h2>
 <div class="ranges"><button data-r="1h">1시간</button><button data-r="1d" class="active">오늘</button><button data-r="5d">5일</button><button data-r="1mo">1개월</button></div>
 <div class="chart"><canvas id="chart"></canvas></div><div id="corrPanel" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
-<div style="font-weight:800;margin-bottom:10px">닉스환율 ↔ USD/KRW · Rolling Correlation</div>
-<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-<div style="padding:10px 5px;border:1px solid var(--line);border-radius:13px;text-align:center"><div class="note" style="margin:0">5D Corr</div><div id="corr5" style="font-size:21px;font-weight:900;margin-top:3px">—</div></div>
-<div style="padding:10px 5px;border:1px solid var(--line);border-radius:13px;text-align:center"><div class="note" style="margin:0">10D Corr</div><div id="corr10" style="font-size:21px;font-weight:900;margin-top:3px">—</div></div>
-<div style="padding:10px 5px;border:1px solid var(--line);border-radius:13px;text-align:center"><div class="note" style="margin:0">20D Corr</div><div id="corr20" style="font-size:21px;font-weight:900;margin-top:3px">—</div></div>
-</div>
-<div id="corrNote" class="note">가격 레벨 기준 Pearson 상관계수</div>
+  <div style="font-weight:800;margin-bottom:8px">Level corr.</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">5D</div><div id="level5" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">10D</div><div id="level10" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">20D</div><div id="level20" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">30D</div><div id="level30" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+  </div>
+
+  <div style="font-weight:800;margin:14px 0 8px">Return corr.</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">5D</div><div id="return5" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">10D</div><div id="return10" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">20D</div><div id="return20" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+    <div style="padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center"><div class="note" style="margin:0">30D</div><div id="return30" style="font-size:18px;font-weight:900;margin-top:3px">—</div></div>
+  </div>
+
+  <div id="corrInterpretation" class="note" style="margin-top:11px;line-height:1.5">해석: 계산 가능한 데이터가 쌓이면 자동으로 표시됩니다.</div>
 </div>
 <div class="note">SKHY 현재값은 Cloudflare Worker의 Yahoo WebSocket(BOATS/Overnight)을 우선 사용하고, 실패하면 Yahoo 프리/정규/애프터 가격으로 자동 전환합니다. 닉스환율과 실제 USD/KRW를 같은 축에서 비교합니다. 한국·미국 시장 거래시간이 다르므로 과거 닉스환율은 각 시점에서 이용 가능한 최신 가격을 이어서 계산한 참고지표입니다.</div>
 </section>
@@ -76,11 +86,74 @@ function pearson(a,b){if(a.length!==b.length||a.length<2)return null;const ma=a.
 function corrText(r){const a=Math.abs(r);if(a>=.7)return r>=0?'강한 동행':'강한 역행';if(a>=.3)return r>=0?'양의 상관':'음의 상관';return'뚜렷한 관계 없음'}
 function showCorr(p){
  const daily=new Map();
- for(const v of p){if(Number.isFinite(v.n)&&Number.isFinite(v.x)){const d=new Date(v.t).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});daily.set(d,v)}}
+ for(const v of p){
+   if(Number.isFinite(v.n)&&Number.isFinite(v.x)){
+     const key=new Date(v.t).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+     daily.set(key,v);
+   }
+ }
  const d=[...daily.values()].sort((a,b)=>a.t-b.t);
- function calc(days,id){const el=$(id);if(!el)return;const s=d.slice(-days);if(s.length<days){el.textContent=`${s.length}/${days}`;return}const r=pearson(s.map(v=>v.n),s.map(v=>v.x));el.textContent=r==null?'—':(r>=0?'+':'')+r.toFixed(2)}
- calc(5,'corr5');calc(10,'corr10');calc(20,'corr20');
- const note=$('corrNote');if(note)note.textContent=`가격 레벨 기준 Pearson · 확보 ${d.length}거래일`;
+
+ function fmt(r){return r==null?'—':(r>=0?'+':'')+r.toFixed(2)}
+ function setVal(id,v){const el=$(id);if(el)el.textContent=v}
+
+ function levelCorr(days){
+   const s=d.slice(-days);
+   if(s.length<days)return null;
+   return pearson(s.map(v=>v.n),s.map(v=>v.x));
+ }
+ function returnCorr(days){
+   // N daily prices are needed to create N-1 returns, so use days+1 observations.
+   const s=d.slice(-(days+1));
+   if(s.length<days+1)return null;
+   const nr=[],xr=[];
+   for(let i=1;i<s.length;i++){
+     if(s[i-1].n>0&&s[i-1].x>0){
+       nr.push(s[i].n/s[i-1].n-1);
+       xr.push(s[i].x/s[i-1].x-1);
+     }
+   }
+   if(nr.length<days)return null;
+   return pearson(nr,xr);
+ }
+
+ const periods=[5,10,20,30];
+ const levels={},returns={};
+ for(const days of periods){
+   levels[days]=levelCorr(days);
+   returns[days]=returnCorr(days);
+   setVal('level'+days, levels[days]==null ? `${Math.min(d.length,days)}/${days}` : fmt(levels[days]));
+   setVal('return'+days, returns[days]==null ? `${Math.min(Math.max(d.length-1,0),days)}/${days}` : fmt(returns[days]));
+ }
+
+ function strength(r){
+   const a=Math.abs(r);
+   if(a>=0.8)return '매우 강한';
+   if(a>=0.6)return '강한';
+   if(a>=0.4)return '중간 정도의';
+   if(a>=0.2)return '약한';
+   return '거의 없는';
+ }
+ function direction(r){return r>=0?'양(+)의':'음(-)의'}
+
+ const note=$('corrInterpretation');
+ if(note){
+   const l=levels[20] ?? levels[10] ?? levels[5];
+   const rr=returns[20] ?? returns[10] ?? returns[5];
+   if(l==null&&rr==null){
+     note.textContent=`해석: 상관계수를 계산하기 위한 거래일 데이터가 아직 부족합니다.`;
+   }else if(l!=null&&rr!=null){
+     let msg=`해석: Level은 ${strength(l)} ${direction(l)} 동행`;
+     if(Math.abs(l)>=0.6 && Math.abs(rr)<0.3) msg+=`, Return은 ${strength(rr)} 상관 → 장기 방향은 비슷하지만 일별 움직임은 독립적인 편입니다.`;
+     else if(Math.abs(l)>=0.6 && Math.abs(rr)>=0.6) msg+=`, Return도 ${strength(rr)} ${direction(rr)} 상관 → 방향뿐 아니라 일별 변동도 함께 움직이는 편입니다.`;
+     else if(Math.abs(l)<0.4 && Math.abs(rr)>=0.6) msg+=`, Return은 ${strength(rr)} ${direction(rr)} 상관 → 가격 수준은 달라도 단기 변화 방향은 함께 움직이는 편입니다.`;
+     else msg+=`, Return은 ${strength(rr)} ${direction(rr)} 상관입니다.`;
+     note.textContent=msg;
+   }else{
+     const r=l??rr;
+     note.textContent=`해석: 현재 계산 가능한 지표에서는 ${strength(r)} ${direction(r)} 상관이 관찰됩니다.`;
+   }
+ }
 }
 
 async function history(){try{status('차트 조회 중…');const int=range==='1mo'?'30m':range==='5d'?'15m':'5m',rg=range==='1h'?'1d':range;const [a,b,c]=await Promise.all([get(Y('000660.KS',int,rg)),get(Y('SKHY',int,rg)),get(Y('USDKRW=X',int,rg))]);const K=series(a),U=series(b),X=series(c),cut=Date.now()-ms();let ki=-1,ui=-1,xi=-1;const times=[...new Set([...K,...U,...X].map(z=>z.t).filter(t=>t>=cut))].sort((a,b)=>a-b),p=[];for(const t of times){while(ki+1<K.length&&K[ki+1].t<=t)ki++;while(ui+1<U.length&&U[ui+1].t<=t)ui++;while(xi+1<X.length&&X[xi+1].t<=t)xi++;if(ki>=0&&ui>=0)p.push({t,n:.1*K[ki].v/U[ui].v,x:xi>=0?X[xi].v:null})}const newest=p.at(-1)?.t||0;live.filter(q=>q.t>newest&&q.t>=cut).forEach(q=>p.push(q));renderChart(p);showCorr(p);status('최근 체결가 반영',true)}catch(e){console.error(e);const fp=live.filter(p=>p.t>Date.now()-ms()).map(q=>({t:q.t,n:q.n,x:q.x}));renderChart(fp);showCorr(fp);status('과거차트 일부 제한',false)}}
