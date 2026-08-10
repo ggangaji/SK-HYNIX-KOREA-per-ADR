@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v2</title>
+<title>닉스환율 지표추적자 v2.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -21,7 +21,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v2 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v2.1 · SK hynix Korea / ADR</div>
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
 <div class="grid">
@@ -37,7 +37,7 @@
 <section class="panel"><h2>닉스환율 추이</h2>
 <div class="ranges"><button data-r="1h">1시간</button><button data-r="1d" class="active">오늘</button><button data-r="5d">5일</button><button data-r="1mo">1개월</button></div>
 <div class="chart"><canvas id="chart"></canvas></div>
-<div class="note">닉스환율과 실제 USD/KRW를 같은 축에서 비교합니다. 한국·미국 시장 거래시간이 다르므로 과거 닉스환율은 각 시점에서 이용 가능한 최신 가격을 이어서 계산한 참고지표입니다.</div>
+<div class="note">닉스환율과 실제 USD/KRW를 같은 축에서 비교합니다. 현재값은 미국 데이마켓 시간(ET 20:00~04:00)에 Yahoo의 BOATS overnight 값을 우선 사용합니다. 한국·미국 시장 거래시간이 다르므로 과거 닉스환율은 각 시점에서 이용 가능한 최신 가격을 이어서 계산한 참고지표입니다.</div>
 </section>
 
 <section class="panel"><h2>수동 입력</h2><div class="manual">
@@ -63,7 +63,124 @@ function save(n,x){live.push({t:Date.now(),n,x});const cut=Date.now()-31*864e5;l
 function ms(){return range==='1h'?36e5:range==='1d'?864e5:range==='5d'?5*864e5:31*864e5}
 function renderChart(p){if(typeof Chart==='undefined')return;if(chart)chart.destroy();chart=new Chart($('chart'),{type:'line',data:{labels:p.map(q=>new Date(q.t).toLocaleString('ko-KR',range==='1h'||range==='1d'?{hour:'2-digit',minute:'2-digit',hour12:false}:{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})),datasets:[{label:'닉스환율',data:p.map(q=>q.n),borderWidth:2,pointRadius:0,tension:.15,spanGaps:true},{label:'USD/KRW',data:p.map(q=>q.x),borderWidth:1.5,pointRadius:0,tension:.15,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cbd5e1'}}},scales:{x:{ticks:{color:'#95a1b2',maxTicksLimit:7},grid:{color:'rgba(149,161,178,.08)'}},y:{ticks:{color:'#95a1b2'},grid:{color:'rgba(149,161,178,.1)'}}}}})}
 async function history(){try{status('차트 조회 중…');const int=range==='1mo'?'30m':range==='5d'?'15m':'5m',rg=range==='1h'?'1d':range;const [a,b,c]=await Promise.all([get(Y('000660.KS',int,rg)),get(Y('SKHY',int,rg)),get(Y('USDKRW=X',int,rg))]);const K=series(a),U=series(b),X=series(c),cut=Date.now()-ms();let ki=-1,ui=-1,xi=-1;const times=[...new Set([...K,...U,...X].map(z=>z.t).filter(t=>t>=cut))].sort((a,b)=>a-b),p=[];for(const t of times){while(ki+1<K.length&&K[ki+1].t<=t)ki++;while(ui+1<U.length&&U[ui+1].t<=t)ui++;while(xi+1<X.length&&X[xi+1].t<=t)xi++;if(ki>=0&&ui>=0)p.push({t,n:.1*K[ki].v/U[ui].v,x:xi>=0?X[xi].v:null})}const newest=p.at(-1)?.t||0;live.filter(q=>q.t>newest&&q.t>=cut).forEach(q=>p.push(q));renderChart(p);status('최근 체결가 반영',true)}catch(e){console.error(e);renderChart(live.filter(p=>p.t>Date.now()-ms()));status('과거차트 일부 제한',false)}}
-async function update(){if(!auto)return;try{status('시세 조회 중…');const[a,b,c]=await Promise.all([get(Y('000660.KS')),get(Y('SKHY')),get(Y('USDKRW=X'))]);const k=latest(a),u=latest(b),x=latest(c),n=draw(k,u,x);save(n,x.v);status('최근 체결가 반영',true)}catch(e){console.error(e);status('자동조회 실패 · 수동입력 가능',false)}}
+
+function isUsOvernightNow(){
+  try{
+    const p=new Intl.DateTimeFormat('en-US',{
+      timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false,weekday:'short'
+    }).formatToParts(new Date());
+    const q=Object.fromEntries(p.map(x=>[x.type,x.value]));
+    const m=+q.hour*60 + +q.minute;
+    return (m>=20*60 || m<4*60);
+  }catch{return false}
+}
+
+async function getText(url){
+  let e;
+  for(const u of [
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(url)}`
+  ]){
+    try{
+      const r=await fetch(u,{cache:'no-store'});
+      if(!r.ok) throw Error(r.status);
+      return await r.text();
+    }catch(x){e=x}
+  }
+  throw e;
+}
+
+function parseOvernightFromQuoteJson(j){
+  const q=j?.quoteResponse?.result?.[0];
+  if(!q) return null;
+  const price=Number(q.overnightMarketPrice);
+  const tm=Number(q.overnightMarketTime);
+  if(Number.isFinite(price)&&price>0){
+    return {v:price,t:tm?tm*1000:Date.now(),meta:{exchangeTimezoneName:'America/New_York'},overnight:true,source:'Yahoo quote'};
+  }
+  return null;
+}
+
+function parseOvernightFromHtml(s){
+  if(!s) return null;
+  const pats=[
+    /"overnightMarketPrice"\s*:\s*\{"raw"\s*:\s*([0-9.]+)/i,
+    /"overnightMarketPrice"\s*:\s*([0-9.]+)/i,
+    /\bovernightMarketPrice\\?":\s*\{?\\?"?raw\\?"?\s*:\s*([0-9.]+)/i
+  ];
+  let price=null;
+  for(const p of pats){
+    const m=s.match(p); if(m){price=Number(m[1]);break}
+  }
+  let tm=null;
+  const tps=[
+    /"overnightMarketTime"\s*:\s*([0-9]{10,13})/i,
+    /"overnightMarketTime"\s*:\s*\{"raw"\s*:\s*([0-9]{10,13})/i
+  ];
+  for(const p of tps){
+    const m=s.match(p); if(m){tm=Number(m[1]);break}
+  }
+  if(Number.isFinite(price)&&price>0){
+    if(tm && tm<1e12) tm*=1000;
+    return {v:price,t:tm||Date.now(),meta:{exchangeTimezoneName:'America/New_York'},overnight:true,source:'Yahoo page'};
+  }
+  return null;
+}
+
+async function getSkhyOvernight(){
+  if(!isUsOvernightNow()) return null;
+
+  // 1) Yahoo quote endpoint: overnightMarketPrice / overnightMarketTime
+  try{
+    const qurl='https://query1.finance.yahoo.com/v7/finance/quote?symbols=SKHY&fields=regularMarketPrice,preMarketPrice,postMarketPrice,overnightMarketPrice,overnightMarketTime&formatted=false&region=US&lang=en-US';
+    const q=await get(qurl);
+    const o=parseOvernightFromQuoteJson(q);
+    if(o) return o;
+  }catch(e){console.warn('overnight quote endpoint failed',e)}
+
+  // 2) Yahoo public quote page HTML fallback
+  try{
+    const page=await getText('https://finance.yahoo.com/quote/SKHY/');
+    const o=parseOvernightFromHtml(page);
+    if(o) return o;
+  }catch(e){console.warn('overnight page fallback failed',e)}
+
+  return null;
+}
+
+async function update(){
+  if(!auto)return;
+  try{
+    status('시세 조회 중…');
+
+    const [a,b,c,overnight] = await Promise.all([
+      get(Y('000660.KS')),
+      get(Y('SKHY')),
+      get(Y('USDKRW=X')),
+      getSkhyOvernight()
+    ]);
+
+    const k=latest(a);
+    const regularSkhy=latest(b);
+    const x=latest(c);
+
+    // 미국 ET 20:00~04:00 구간에는 BOATS overnight 값을 최우선 사용.
+    const u = overnight || regularSkhy;
+    const n=draw(k,u,x);
+
+    if(overnight){
+      $('uss').textContent='데이마켓 · BOATS';
+      status('SKHY 데이마켓(BOATS) 반영',true);
+    }else{
+      status('최근 체결가 반영',true);
+    }
+
+    save(n,x.v);
+  }catch(e){
+    console.error(e);
+    status('자동조회 실패 · 수동입력 가능',false);
+  }
+}
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;history()});
 $('refresh').onclick=()=>{auto=true;update();history()};$('auto').onclick=()=>{auto=true;update();history()};
 $('calc').onclick=()=>{const k=+$('mkr').value.replaceAll(',',''),u=+$('mus').value.replaceAll(',','');if(!(k>0&&u>0))return alert('두 가격을 입력해 주세요.');auto=false;draw({v:k},{v:u},last.x?{v:last.x}:null,true);status('수동 입력')};
