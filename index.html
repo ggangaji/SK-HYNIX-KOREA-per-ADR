@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v0.5</title>
+<title>닉스환율 지표추적자 v0.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -21,7 +21,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v0.5 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v0.6 · SK hynix Korea / ADR</div>
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
 <div class="grid">
@@ -110,7 +110,7 @@ function showCorr(p){
  const daily=new Map();
  for(const v of p){
    if(Number.isFinite(v.n)&&Number.isFinite(v.x)){
-     const key=new Date(v.t).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
+     const key=v.date||new Date(v.t).toLocaleDateString('sv-SE',{timeZone:'Asia/Seoul'});
      daily.set(key,v);
    }
  }
@@ -180,6 +180,46 @@ function showCorr(p){
 
 
 
+
+function dateKeyKST(t){
+  return new Intl.DateTimeFormat('sv-SE',{
+    timeZone:'Asia/Seoul',
+    year:'numeric',month:'2-digit',day:'2-digit'
+  }).format(new Date(t));
+}
+function toDailyMap(points){
+  const m=new Map();
+  for(const p of points){
+    if(Number.isFinite(p.t)&&Number.isFinite(p.v)){
+      m.set(dateKeyKST(p.t),p);
+    }
+  }
+  return m;
+}
+function alignDailySeries(K,U,X){
+  const km=toDailyMap(K), um=toDailyMap(U), xm=toDailyMap(X);
+  const dates=[...new Set([...km.keys(),...um.keys(),...xm.keys()])].sort();
+
+  let lastK=null,lastU=null,lastX=null;
+  const out=[];
+
+  for(const d of dates){
+    if(km.has(d)) lastK=km.get(d);
+    if(um.has(d)) lastU=um.get(d);
+    if(xm.has(d)) lastX=xm.get(d);
+
+    if(lastK&&lastU&&lastX){
+      out.push({
+        date:d,
+        t:Math.max(lastK.t,lastU.t,lastX.t),
+        n:.1*lastK.v/lastU.v,
+        x:lastX.v
+      });
+    }
+  }
+  return out;
+}
+
 async function loadCorrelationHistory(){
   try{
     const j=await getWorkerHistory('corr');
@@ -187,27 +227,17 @@ async function loadCorrelationHistory(){
     const U=workerPoints(j.skhy);
     const X=workerPoints(j.fx);
 
-    let ki=-1,ui=-1,xi=-1;
-    const times=[...new Set([...K,...U,...X].map(z=>z.t))].sort((a,b)=>a-b);
-    const p=[];
-
-    for(const t of times){
-      while(ki+1<K.length&&K[ki+1].t<=t)ki++;
-      while(ui+1<U.length&&U[ui+1].t<=t)ui++;
-      while(xi+1<X.length&&X[xi+1].t<=t)xi++;
-
-      if(ki>=0&&ui>=0&&xi>=0){
-        p.push({t,n:.1*K[ki].v/U[ui].v,x:X[xi].v});
-      }
+    if(!K.length||!U.length||!X.length){
+      throw Error('Corr Worker 과거 시세 부족');
     }
 
+    const p=alignDailySeries(K,U,X);
     showCorr(p);
 
   }catch(e){
     console.warn('Correlation Worker failed',e);
   }
 }
-
 
 async function history(){
   try{
@@ -218,37 +248,39 @@ async function history(){
     const U=workerPoints(j.skhy);
     const X=workerPoints(j.fx);
 
-    if(!K.length||!U.length||!X.length) throw Error('Worker 과거 시세 부족');
+    if(!K.length||!U.length||!X.length){
+      throw Error('Worker 과거 시세 부족');
+    }
 
-    const cut=Date.now()-ms();
-    let ki=-1,ui=-1,xi=-1;
+    let p=[];
 
-    const times=[...new Set(
-      [...K,...U,...X].map(z=>z.t).filter(t=>t>=cut)
-    )].sort((a,b)=>a-b);
+    if(range==='1mo'){
+      // 1개월은 일봉을 한국 날짜 기준으로 정렬.
+      p=alignDailySeries(K,U,X);
+    }else{
+      const cut=Date.now()-ms();
+      let ki=-1,ui=-1,xi=-1;
 
-    const p=[];
+      const times=[...new Set(
+        [...K,...U,...X].map(z=>z.t).filter(t=>t>=cut)
+      )].sort((a,b)=>a-b);
 
-    for(const t of times){
-      while(ki+1<K.length&&K[ki+1].t<=t)ki++;
-      while(ui+1<U.length&&U[ui+1].t<=t)ui++;
-      while(xi+1<X.length&&X[xi+1].t<=t)xi++;
+      for(const t of times){
+        while(ki+1<K.length&&K[ki+1].t<=t)ki++;
+        while(ui+1<U.length&&U[ui+1].t<=t)ui++;
+        while(xi+1<X.length&&X[xi+1].t<=t)xi++;
 
-      if(ki>=0&&ui>=0&&xi>=0){
-        p.push({
-          t,
-          n:.1*K[ki].v/U[ui].v,
-          x:X[xi].v
-        });
+        if(ki>=0&&ui>=0&&xi>=0){
+          p.push({t,n:.1*K[ki].v/U[ui].v,x:X[xi].v});
+        }
+      }
+
+      if(range==='1h'){
+        p=p.filter(q=>q.t>=Date.now()-3600000);
       }
     }
 
-    // 1시간은 1일 데이터를 받아 마지막 1시간만 필터
-    const displayPoints = range==='1h'
-      ? p.filter(q=>q.t>=Date.now()-3600000)
-      : p;
-
-    renderChart(displayPoints);
+    renderChart(p);
     status('과거차트 Worker 반영',true);
 
   }catch(e){
