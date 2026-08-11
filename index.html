@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v0.6</title>
+<title>닉스환율 지표추적자 v0.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -13,7 +13,7 @@
 .card{background:linear-gradient(180deg,#171e27,#11171f);border:1px solid var(--line);border-radius:22px;padding:24px 18px;margin-bottom:12px}
 .eyebrow{text-align:center;color:var(--muted);font-weight:800;font-size:14px}.big{text-align:center;font-size:clamp(58px,16vw,92px);font-weight:850;letter-spacing:-.055em;line-height:1;margin:12px 0 5px}.unit{text-align:center;color:var(--muted);font-weight:700}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:20px}.box,.fx{background:var(--card2);border:1px solid var(--line);border-radius:15px;padding:13px}
-.label{font-size:12px;color:var(--muted);font-weight:750}.price{font-size:22px;font-weight:850;margin-top:5px}.session{font-size:11px;color:var(--accent);font-weight:750;margin-top:5px}
+.label{font-size:12px;color:var(--muted);font-weight:750}.price{font-size:22px;font-weight:850;margin-top:5px}.chg{font-size:14px;font-weight:850;margin-left:7px;white-space:nowrap}.up{color:#ff6677}.down{color:#6aa7ff}.flat{color:#95a1b2}.session{font-size:11px;color:var(--accent);font-weight:750;margin-top:5px}
 .fx{margin-top:9px;display:flex;justify-content:space-between;gap:10px}.right{text-align:right}.diff{font-weight:800;margin-top:5px}
 .formula{background:#0d1218;border:1px solid var(--line);border-radius:13px;padding:13px;text-align:center;margin-top:10px;font-family:ui-monospace,Menlo,monospace;font-size:13px}
 .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin:10px 2px}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#7c8797;margin-right:5px}
@@ -24,15 +24,15 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v0.6 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v0.7 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
 <div class="grid">
- <div class="box"><div class="label">🇰🇷 SK하이닉스 · 000660</div><div class="price" id="kr">--</div><div class="session" id="ks">--</div></div>
- <div class="box"><div class="label">🇺🇸 SKHY · NASDAQ</div><div class="price" id="us">--</div><div class="session" id="uss">--</div></div>
+ <div class="box"><div class="label">🇰🇷 SK하이닉스 · 000660</div><div class="price"><span id="kr">--</span><span class="chg flat" id="krchg">--</span></div><div class="session" id="ks">--</div></div>
+ <div class="box"><div class="label">🇺🇸 SKHY · NASDAQ</div><div class="price"><span id="us">--</span><span class="chg flat" id="uschg">--</span></div><div class="session" id="uss">--</div></div>
 </div>
-<div class="fx"><div><div class="label">💱 USD/KRW</div><div class="price" id="fx">--</div></div><div class="right"><div class="label">닉스환율 − USD/KRW</div><div class="diff" id="diff">--</div></div></div>
+<div class="fx"><div><div class="label">💱 USD/KRW</div><div class="price"><span id="fx">--</span><span class="chg flat" id="fxchg">--</span></div></div><div class="right"><div class="label">닉스환율 − USD/KRW</div><div class="diff" id="diff">--</div></div></div>
 <div class="formula" id="formula">0.1 × -- ÷ --</div>
 <div class="meta"><div><span class="dot" id="dot"></span><span id="status">조회 대기</span></div><div id="updated">--</div></div>
 <div class="actions"><button class="primary" id="refresh">지금 새로고침</button><button id="copy">게시판용 문구 복사</button></div>
@@ -60,7 +60,7 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">현재가와 과거 데이터 모두 Cloudflare Worker를 통해 조회합니다.</div>
+<div class="note">현재가와 과거 데이터 모두 Cloudflare Worker를 통해 조회합니다. 1개월 차트와 Corr는 1시간 간격 시계열을 사용합니다.</div>
 </section>
 </main>
 
@@ -89,11 +89,61 @@ function alignDaily(K,U,X){
  for(const d of dates){if(km.has(d))k=km.get(d);if(um.has(d))u=um.get(d);if(xm.has(d))x=xm.get(d);if(k&&u&&x)out.push({date:d,t:Math.max(k.t,u.t,x.t),n:.1*k.v/u.v,x:x.v})}
  return out;
 }
+
+function hourKeyKST(t){
+ const parts=new Intl.DateTimeFormat('sv-SE',{
+   timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hour12:false
+ }).formatToParts(new Date(t));
+ const q=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+ return `${q.year}-${q.month}-${q.day} ${q.hour}`;
+}
+function toHourlyLast(a){
+ const m=new Map();
+ for(const p of a){
+   if(Number.isFinite(p.t)&&Number.isFinite(p.v))m.set(hourKeyKST(p.t),p);
+ }
+ return m;
+}
+function alignHourly(K,U,X){
+ const km=toHourlyLast(K),um=toHourlyLast(U),xm=toHourlyLast(X);
+ const keys=[...new Set([...km.keys(),...um.keys(),...xm.keys()])].sort();
+ let k=null,u=null,x=null;
+ const out=[];
+ for(const hk of keys){
+   if(km.has(hk))k=km.get(hk);
+   if(um.has(hk))u=um.get(hk);
+   if(xm.has(hk))x=xm.get(hk);
+   if(k&&u&&x)out.push({hour:hk,t:Math.max(k.t,u.t,x.t),n:.1*k.v/u.v,x:x.v});
+ }
+ return out;
+}
+
 function alignIntraday(K,U,X){
  let ki=-1,ui=-1,xi=-1;const ts=[...new Set([...K,...U,...X].map(p=>p.t))].sort((a,b)=>a-b),out=[];
  for(const t of ts){while(ki+1<K.length&&K[ki+1].t<=t)ki++;while(ui+1<U.length&&U[ui+1].t<=t)ui++;while(xi+1<X.length&&X[xi+1].t<=t)xi++;if(ki>=0&&ui>=0&&xi>=0)out.push({t,n:.1*K[ki].v/U[ui].v,x:X[xi].v})}
  return out;
 }
+
+function setChange(id,pct){
+ const el=$(id);
+ if(!el)return;
+ if(!Number.isFinite(pct)){el.textContent='--';el.className='chg flat';return}
+ el.textContent=(pct>0?'+':'')+pct.toFixed(2)+'%';
+ el.className='chg '+(pct>0?'up':pct<0?'down':'flat');
+}
+function koreaSession(){
+ try{
+  const p=new Intl.DateTimeFormat('en-US',{
+    timeZone:'Asia/Seoul',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false
+  }).formatToParts(new Date());
+  const q=Object.fromEntries(p.map(x=>[x.type,x.value]));
+  if(q.weekday==='Sat'||q.weekday==='Sun')return'장 마감 / 종가';
+  let h=+q.hour;if(h===24)h=0;
+  const m=h*60+(+q.minute);
+  return (m>=540&&m<930)?'KRX 정규장 / 현재가':'장 마감 / 종가';
+ }catch{return'KRX'}
+}
+
 function usSession(){
  try{const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date()),q=Object.fromEntries(p.map(x=>[x.type,x.value]));if(q.weekday==='Sat'||q.weekday==='Sun')return'미국장 휴장 / 최근가';let h=+q.hour;if(h===24)h=0;const m=h*60+(+q.minute);if(m>=240&&m<570)return'Pre-market';if(m>=570&&m<960)return'Regular Market';if(m>=960&&m<1200)return'After-hours';return'BOATS / Overnight'}catch{return'최근가'}
 }
@@ -108,9 +158,20 @@ async function update(){
   const fallbackU=Number(h.skhy?.regularMarketPrice)||points(h.skhy).at(-1)?.v;
   const up=(ws?.received&&Number.isFinite(+ws.price))?+ws.price:fallbackU;
   if(!(kp>0&&up>0&&xp>0))throw Error('현재가 부족');
+
+  const kprev=Number(h.korea?.previousClose);
+  const xprev=Number(h.fx?.previousClose);
+  const uprev=Number(h.skhy?.previousClose);
+  const kchg=(kprev>0)?(kp/kprev-1)*100:null;
+  const xchg=(xprev>0)?(xp/xprev-1)*100:null;
+  const uchg=(ws?.received&&Number.isFinite(+ws.changePercent))
+    ? +ws.changePercent
+    : ((uprev>0)?(up/uprev-1)*100:null);
+
   const n=.1*kp/up,d=n-xp,p=d/xp*100;last={k:kp,u:up,x:xp,n};
   $('result').textContent=f2(n);$('kr').textContent=f0(kp)+'원';$('us').textContent='$'+f2(up);$('fx').textContent=f2(xp);
-  $('ks').textContent='KRX 정규장 / 종가';$('uss').textContent=usSession();
+  setChange('krchg',kchg);setChange('uschg',uchg);setChange('fxchg',xchg);
+  $('ks').textContent=koreaSession();$('uss').textContent=usSession();
   $('diff').textContent=`${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)`;$('diff').style.color=d>0?'#35c98a':d<0?'#ff6677':'#95a1b2';
   $('formula').textContent=`0.1 × ${f0(kp)} ÷ ${f2(up)} = ${f2(n)}`;
   $('updated').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});
@@ -124,7 +185,7 @@ function render(p){
  chart=new Chart($('chart'),{type:'line',data:{labels,datasets:[{label:'닉스환율',data:p.map(q=>q.n),borderWidth:2,pointRadius:0,tension:.15},{label:'USD/KRW',data:p.map(q=>q.x),borderWidth:1.5,pointRadius:0,tension:.15}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cbd5e1'}}},scales:{x:{ticks:{color:'#95a1b2',maxTicksLimit:7},grid:{color:'rgba(149,161,178,.08)'}},y:{ticks:{color:'#95a1b2'},grid:{color:'rgba(149,161,178,.1)'}}}}});
 }
 async function loadChart(){
- try{status('차트 조회 중…');const h=await historyData(range);if(!h.ok)throw Error(h.error||'chart');const K=points(h.korea),U=points(h.skhy),X=points(h.fx);let p=range==='1mo'?alignDaily(K,U,X):alignIntraday(K,U,X);if(range==='1h')p=p.filter(q=>q.t>=Date.now()-3600000);render(p);status('과거차트 Worker 반영',true)}catch(e){console.error(e);status('과거차트 조회 실패',false)}
+ try{status('차트 조회 중…');const h=await historyData(range);if(!h.ok)throw Error(h.error||'chart');const K=points(h.korea),U=points(h.skhy),X=points(h.fx);let p=range==='1mo'?alignHourly(K,U,X):alignIntraday(K,U,X);if(range==='1h')p=p.filter(q=>q.t>=Date.now()-3600000);render(p);status('과거차트 Worker 반영',true)}catch(e){console.error(e);status('과거차트 조회 실패',false)}
 }
 
 function pearson(a,b){if(a.length!==b.length||a.length<2)return null;const ma=a.reduce((s,v)=>s+v,0)/a.length,mb=b.reduce((s,v)=>s+v,0)/b.length;let n=0,da=0,db=0;for(let i=0;i<a.length;i++){const x=a[i]-ma,y=b[i]-mb;n+=x*y;da+=x*x;db+=y*y}const den=Math.sqrt(da*db);return den?n/den:null}
@@ -133,13 +194,25 @@ function direction(r){return r>=0?'양(+)의':'음(-)의'}
 async function loadCorr(){
  try{
   const h=await historyData('corr');if(!h.ok)throw Error(h.error||'corr');
-  const d=alignDaily(points(h.korea),points(h.skhy),points(h.fx));
+  const d=alignHourly(points(h.korea),points(h.skhy),points(h.fx));
   const levels={},rets={};
+  const now=d.at(-1)?.t||Date.now();
   for(const n of [5,10,20,30]){
-   const s=d.slice(-n);levels[n]=s.length===n?pearson(s.map(v=>v.n),s.map(v=>v.x)):null;
-   const q=d.slice(-(n+1));if(q.length===n+1){const a=[],b=[];for(let i=1;i<q.length;i++){a.push(q[i].n/q[i-1].n-1);b.push(q[i].x/q[i-1].x-1)}rets[n]=pearson(a,b)}else rets[n]=null;
-   $('level'+n).textContent=levels[n]==null?`${Math.min(d.length,n)}/${n}`:`${levels[n]>=0?'+':''}${levels[n].toFixed(2)}`;
-   $('return'+n).textContent=rets[n]==null?`${Math.min(Math.max(d.length-1,0),n)}/${n}`:`${rets[n]>=0?'+':''}${rets[n].toFixed(2)}`;
+   const cut=now-n*86400000;
+   const s=d.filter(v=>v.t>=cut);
+   levels[n]=s.length>=12?pearson(s.map(v=>v.n),s.map(v=>v.x)):null;
+   if(s.length>=13){
+     const a=[],b=[];
+     for(let i=1;i<s.length;i++){
+       if(s[i-1].n>0&&s[i-1].x>0){
+         a.push(s[i].n/s[i-1].n-1);
+         b.push(s[i].x/s[i-1].x-1);
+       }
+     }
+     rets[n]=a.length>=12?pearson(a,b):null;
+   }else rets[n]=null;
+   $('level'+n).textContent=levels[n]==null?'—':`${levels[n]>=0?'+':''}${levels[n].toFixed(2)}`;
+   $('return'+n).textContent=rets[n]==null?'—':`${rets[n]>=0?'+':''}${rets[n].toFixed(2)}`;
   }
   const l=levels[20]??levels[10]??levels[5],r=rets[20]??rets[10]??rets[5];
   $('corrInterpretation').textContent=(l==null&&r==null)?'해석: 상관계수를 계산할 데이터가 아직 부족합니다.':(l!=null&&r!=null)?`해석: Level은 ${strength(l)} ${direction(l)} 상관, Return은 ${strength(r)} ${direction(r)} 상관입니다.`:`해석: 현재 계산 가능한 지표에서 ${strength(l??r)} ${direction(l??r)} 상관이 관찰됩니다.`;
