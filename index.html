@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v0.9</title>
+<title>닉스환율 지표추적자 v0.91</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -24,7 +24,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v0.9 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v0.91 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -60,32 +60,288 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">상단은 최신 가용가격 기준 현재 괴리, 차트와 Corr는 실제 timestamp를 맞춘 동기화 데이터 기준입니다.</div>
+<div class="note">v0.91: 1시간·오늘은 D1 1분 누적값을, 5일·1개월은 과거 시계열을 사용합니다. 자동 갱신 시 기간과 범례 표시 상태를 유지합니다.</div>
 </section>
 </main>
 
 <script>
-const WORKER='https://nyx-rate-proxy.duienugu.workers.dev',REFRESH=15000,CHART_REFRESH=60000,CORR_REFRESH=300000,$=id=>document.getElementById(id);
-let range='1mo',chart=null,last=null;
-const f0=n=>Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0}),f2=n=>Number(n).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const WORKER='https://nyx-rate-proxy.duienugu.workers.dev', REFRESH=15000, $=id=>document.getElementById(id);
+let range='1mo', chart=null, last=null;
+
+const f0=n=>Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0});
+const f2=n=>Number(n).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
 function status(t,ok){$('status').textContent=t;$('dot').style.background=ok===true?'#35c98a':ok===false?'#ff6677':'#7c8797'}
-async function jget(url,timeout=18000){const c=new AbortController(),tm=setTimeout(()=>c.abort(),timeout);try{const r=await fetch(url,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(tm)}}
-async function historyData(p){return jget(`${WORKER}/history?preset=${encodeURIComponent(p)}`)}
-async function dbHistory(r){return jget(`${WORKER}/db-history?range=${encodeURIComponent(r)}&t=${Date.now()}`,20000)}
+
+async function jget(url, timeout=18000){
+  const c=new AbortController(), tm=setTimeout(()=>c.abort(),timeout);
+  try{const r=await fetch(url,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error('HTTP '+r.status);return await r.json()}
+  finally{clearTimeout(tm)}
+}
+async function historyData(preset){return jget(`${WORKER}/history?preset=${preset}`)}
+async function dbHistory(range){return jget(`${WORKER}/db-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
 async function wsPrice(){try{return await jget(WORKER,17000)}catch{return null}}
-function points(o){return(o?.points||[]).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v))}
-function setChange(id,pct){const el=$(id);if(!el)return;if(!Number.isFinite(pct)){el.textContent='--';el.className='chg flat';return}el.textContent=(pct>0?'+':'')+pct.toFixed(2)+'%';el.className='chg '+(pct>0?'up':pct<0?'down':'flat')}
-function koreaState(){try{const p=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Seoul',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date()),q=Object.fromEntries(p.map(x=>[x.type,x.value]));if(q.weekday==='Sat'||q.weekday==='Sun')return'장 마감 / 종가';let h=+q.hour;if(h===24)h=0;const m=h*60+(+q.minute);if(m>=540&&m<930)return'KRX 20분 지연';if(m>=930&&m<950)return'장 마감 / 종가 반영 대기';return'장 마감 / 종가'}catch{return'KRX'}}
-function usSession(){try{const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date()),q=Object.fromEntries(p.map(x=>[x.type,x.value]));if(q.weekday==='Sat'||q.weekday==='Sun')return'미국장 휴장 / 최근가';let h=+q.hour;if(h===24)h=0;const m=h*60+(+q.minute);if(m>=240&&m<570)return'Pre-market';if(m>=570&&m<960)return'Regular Market';if(m>=960&&m<1200)return'After-hours';return'BOATS / Overnight'}catch{return'최근가'}}
-async function update(){try{status('현재가 조회 중…');const[h,ws]=await Promise.all([historyData('1d'),wsPrice()]);if(!h.ok)throw Error(h.error||'history');const K=points(h.korea),U=points(h.skhy),X=points(h.fx),kp=K.at(-1)?.v,xp=X.at(-1)?.v,fallbackU=U.at(-1)?.v,up=(ws?.received&&Number.isFinite(+ws.price))?+ws.price:fallbackU;if(!(kp>0&&up>0&&xp>0))throw Error('현재가 부족');const kprev=Number(h.korea?.previousClose),xprev=Number(h.fx?.previousClose),uprev=Number(h.skhy?.previousClose),kchg=(kprev>0)?(kp/kprev-1)*100:null,xchg=(xprev>0)?(xp/xprev-1)*100:null,uchg=(ws?.received&&Number.isFinite(+ws.changePercent))?+ws.changePercent:((uprev>0)?(up/uprev-1)*100:null);const n=.1*kp/up,d=n-xp,p=d/xp*100;last={k:kp,u:up,x:xp,n,t:Date.now()};$('result').textContent=f2(n);$('kr').textContent=f0(kp)+'원';$('us').textContent='$'+f2(up);$('fx').textContent=f2(xp);setChange('krchg',kchg);setChange('uschg',uchg);setChange('fxchg',xchg);$('ks').textContent=koreaState();$('uss').textContent=usSession();$('diff').textContent=`${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)`;$('diff').style.color=d>0?'#35c98a':d<0?'#ff6677':'#95a1b2';$('formula').textContent=`0.1 × ${f0(kp)} ÷ ${f2(up)} = ${f2(n)}`;$('updated').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});status(ws?.received?'SKHY WebSocket · 현재 괴리':'SKHY 최근가 · 현재 괴리',true)}catch(e){console.error(e);status('현재가 조회 실패',false)}}
-function analyticalPoints(rows){const m=new Map();for(const r of rows||[]){let t,n,x;if(Number.isFinite(+r.sync_timestamp)&&Number.isFinite(+r.sync_nyx_rate)&&Number.isFinite(+r.sync_usdkrw)){t=+r.sync_timestamp;n=+r.sync_nyx_rate;x=+r.sync_usdkrw}else if(String(r.source||'').startsWith('YAHOO_BACKFILL')){t=+r.timestamp;n=+r.nyx_rate;x=+r.usdkrw}else continue;if(Number.isFinite(t)&&Number.isFinite(n)&&Number.isFinite(x)&&n>0&&x>0)m.set(t,{t,n,x})}return[...m.values()].sort((a,b)=>a.t-b.t)}
-function downsample(p,r){if(p.length<3)return p;const ms=r==='1mo'?3600000:r==='5d'?900000:r==='1d'?300000:60000,b=new Map();for(const q of p)b.set(Math.floor(q.t/ms)*ms,q);return[...b.values()].sort((a,b)=>a.t-b.t)}
-function chartLabel(t){const d=new Date(t);if(range==='1h'||range==='1d')return d.toLocaleTimeString('ko-KR',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false});return d.toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric'})}
-function render(p){if(chart)chart.destroy();chart=new Chart($('chart'),{type:'line',data:{labels:p.map(q=>chartLabel(q.t)),datasets:[{label:'닉스환율 · 동기화',data:p.map(q=>q.n),borderWidth:2,pointRadius:0,tension:.15},{label:'USD/KRW · 동기화',data:p.map(q=>q.x),borderWidth:1.5,pointRadius:0,tension:.15}]},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#cbd5e1'}}},scales:{x:{ticks:{color:'#95a1b2',maxTicksLimit:7,maxRotation:0,autoSkip:true},grid:{color:'rgba(149,161,178,.08)'}},y:{ticks:{color:'#95a1b2'},grid:{color:'rgba(149,161,178,.1)'}}}}})}
-async function loadChart(){try{status('동기화 차트 조회 중…');const h=await dbHistory(range);if(!h.ok)throw Error(h.error||'db history');const p=analyticalPoints(h.points);render(downsample(p,range));status(p.length?`동기화 차트 · ${p.length.toLocaleString()}개`:'동기화 데이터 누적 대기',p.length?true:null)}catch(e){console.error(e);status('동기화 차트 조회 실패',false)}}
+
+function points(o){return (o?.points||[]).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v))}
+function key(t){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t))}
+function dailyMap(a){const m=new Map();for(const p of a)m.set(key(p.t),p);return m}
+function alignDaily(K,U,X){
+ const km=dailyMap(K),um=dailyMap(U),xm=dailyMap(X),dates=[...new Set([...km.keys(),...um.keys(),...xm.keys()])].sort();
+ let k=null,u=null,x=null;const out=[];
+ for(const d of dates){if(km.has(d))k=km.get(d);if(um.has(d))u=um.get(d);if(xm.has(d))x=xm.get(d);if(k&&u&&x)out.push({date:d,t:Math.max(k.t,u.t,x.t),n:.1*k.v/u.v,x:x.v})}
+ return out;
+}
+
+function hourKeyKST(t){
+ const parts=new Intl.DateTimeFormat('sv-SE',{
+   timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hour12:false
+ }).formatToParts(new Date(t));
+ const q=Object.fromEntries(parts.map(x=>[x.type,x.value]));
+ return `${q.year}-${q.month}-${q.day} ${q.hour}`;
+}
+function toHourlyLast(a){
+ const m=new Map();
+ for(const p of a){
+   if(Number.isFinite(p.t)&&Number.isFinite(p.v))m.set(hourKeyKST(p.t),p);
+ }
+ return m;
+}
+function alignHourly(K,U,X){
+ const km=toHourlyLast(K),um=toHourlyLast(U),xm=toHourlyLast(X);
+ const keys=[...new Set([...km.keys(),...um.keys(),...xm.keys()])].sort();
+ let k=null,u=null,x=null;
+ const out=[];
+ for(const hk of keys){
+   if(km.has(hk))k=km.get(hk);
+   if(um.has(hk))u=um.get(hk);
+   if(xm.has(hk))x=xm.get(hk);
+   if(k&&u&&x)out.push({hour:hk,t:Math.max(k.t,u.t,x.t),n:.1*k.v/u.v,x:x.v});
+ }
+ return out;
+}
+
+function alignIntraday(K,U,X){
+ let ki=-1,ui=-1,xi=-1;const ts=[...new Set([...K,...U,...X].map(p=>p.t))].sort((a,b)=>a-b),out=[];
+ for(const t of ts){while(ki+1<K.length&&K[ki+1].t<=t)ki++;while(ui+1<U.length&&U[ui+1].t<=t)ui++;while(xi+1<X.length&&X[xi+1].t<=t)xi++;if(ki>=0&&ui>=0&&xi>=0)out.push({t,n:.1*K[ki].v/U[ui].v,x:X[xi].v})}
+ return out;
+}
+
+
+function dbRawPoints(rows){
+ return (rows||[])
+  .map(r=>({
+    t:Number(r.timestamp),
+    n:Number(r.nyx_rate),
+    x:Number(r.usdkrw)
+  }))
+  .filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.n)&&Number.isFinite(p.x)&&p.n>0&&p.x>0)
+  .sort((a,b)=>a.t-b.t);
+}
+
+function kstTodayStartMs(){
+ const now=new Date();
+ const parts=new Intl.DateTimeFormat('en-US',{
+   timeZone:'Asia/Seoul',
+   year:'numeric',month:'2-digit',day:'2-digit'
+ }).formatToParts(now);
+ const q=Object.fromEntries(parts.map(p=>[p.type,p.value]));
+ return Date.parse(`${q.year}-${q.month}-${q.day}T00:00:00+09:00`);
+}
+
+function chartLabel(t){
+ const d=new Date(t);
+ if(range==='1h'||range==='1d'){
+   return d.toLocaleTimeString('ko-KR',{
+     timeZone:'Asia/Seoul',
+     hour:'2-digit',
+     minute:'2-digit',
+     hour12:false
+   });
+ }
+ return d.toLocaleDateString('ko-KR',{
+   timeZone:'Asia/Seoul',
+   month:'numeric',
+   day:'numeric'
+ });
+}
+
+function setChange(id,pct){
+ const el=$(id);
+ if(!el)return;
+ if(!Number.isFinite(pct)){el.textContent='--';el.className='chg flat';return}
+ el.textContent=(pct>0?'+':'')+pct.toFixed(2)+'%';
+ el.className='chg '+(pct>0?'up':pct<0?'down':'flat');
+}
+function koreaSession(){
+ try{
+  const p=new Intl.DateTimeFormat('en-US',{
+    timeZone:'Asia/Seoul',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false
+  }).formatToParts(new Date());
+  const q=Object.fromEntries(p.map(x=>[x.type,x.value]));
+  if(q.weekday==='Sat'||q.weekday==='Sun')return'장 마감 / 종가';
+  let h=+q.hour;if(h===24)h=0;
+  const m=h*60+(+q.minute);
+  return (m>=540&&m<930)?'KRX 정규장 / 현재가':'장 마감 / 종가';
+ }catch{return'KRX'}
+}
+
+function usSession(){
+ try{const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date()),q=Object.fromEntries(p.map(x=>[x.type,x.value]));if(q.weekday==='Sat'||q.weekday==='Sun')return'미국장 휴장 / 최근가';let h=+q.hour;if(h===24)h=0;const m=h*60+(+q.minute);if(m>=240&&m<570)return'Pre-market';if(m>=570&&m<960)return'Regular Market';if(m>=960&&m<1200)return'After-hours';return'BOATS / Overnight'}catch{return'최근가'}
+}
+
+async function update(){
+ try{
+  status('현재가 조회 중…');
+  const [h,ws]=await Promise.all([historyData('1d'),wsPrice()]);
+  if(!h.ok)throw Error(h.error||'history');
+  const kp=Number(h.korea?.regularMarketPrice)||points(h.korea).at(-1)?.v;
+  const xp=Number(h.fx?.regularMarketPrice)||points(h.fx).at(-1)?.v;
+  const fallbackU=Number(h.skhy?.regularMarketPrice)||points(h.skhy).at(-1)?.v;
+  const up=(ws?.received&&Number.isFinite(+ws.price))?+ws.price:fallbackU;
+  if(!(kp>0&&up>0&&xp>0))throw Error('현재가 부족');
+
+  const kprev=Number(h.korea?.previousClose);
+  const xprev=Number(h.fx?.previousClose);
+  const uprev=Number(h.skhy?.previousClose);
+  const kchg=(kprev>0)?(kp/kprev-1)*100:null;
+  const xchg=(xprev>0)?(xp/xprev-1)*100:null;
+  const uchg=(ws?.received&&Number.isFinite(+ws.changePercent))
+    ? +ws.changePercent
+    : ((uprev>0)?(up/uprev-1)*100:null);
+
+  const n=.1*kp/up,d=n-xp,p=d/xp*100;last={k:kp,u:up,x:xp,n};
+  $('result').textContent=f2(n);$('kr').textContent=f0(kp)+'원';$('us').textContent='$'+f2(up);$('fx').textContent=f2(xp);
+  setChange('krchg',kchg);setChange('uschg',uchg);setChange('fxchg',xchg);
+  $('ks').textContent=koreaSession();$('uss').textContent=usSession();
+  $('diff').textContent=`${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)`;$('diff').style.color=d>0?'#35c98a':d<0?'#ff6677':'#95a1b2';
+  $('formula').textContent=`0.1 × ${f0(kp)} ÷ ${f2(up)} = ${f2(n)}`;
+  $('updated').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});
+  status(ws?.received?'SKHY Yahoo WebSocket 반영':'Worker 최근가 반영',true);
+ }catch(e){console.error(e);status('현재가 조회 실패',false)}
+}
+
+function render(p){
+ const labels=p.map(q=>chartLabel(q.t));
+ const nyxData=p.map(q=>q.n);
+ const fxData=p.map(q=>q.x);
+
+ // 최초 한 번만 차트를 만들고 이후에는 데이터만 교체.
+ // 사용자가 범례에서 숨긴 선의 상태를 자동 새로고침 후에도 유지한다.
+ if(!chart){
+  chart=new Chart($('chart'),{
+   type:'line',
+   data:{
+    labels,
+    datasets:[
+     {label:'닉스환율',data:nyxData,borderWidth:2,pointRadius:0,tension:.15},
+     {label:'USD/KRW',data:fxData,borderWidth:1.5,pointRadius:0,tension:.15}
+    ]
+   },
+   options:{
+    responsive:true,
+    maintainAspectRatio:false,
+    animation:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#cbd5e1'}}},
+    scales:{
+     x:{
+      ticks:{color:'#95a1b2',maxTicksLimit:7,maxRotation:0,autoSkip:true},
+      grid:{color:'rgba(149,161,178,.08)'}
+     },
+     y:{
+      ticks:{color:'#95a1b2'},
+      grid:{color:'rgba(149,161,178,.1)'}
+     }
+    }
+   }
+  });
+  return;
+ }
+
+ chart.data.labels=labels;
+ chart.data.datasets[0].data=nyxData;
+ chart.data.datasets[1].data=fxData;
+ chart.update('none');
+}
+async function loadChart(){
+ try{
+  status('차트 조회 중…');
+
+  // v0.91:
+  // 1시간/오늘 = D1에 실제로 매분 저장된 "현재 괴리" 시계열 사용.
+  // 한국장이 끝난 뒤에도 SKHY가 움직이면 닉스환율 곡선이 계속 움직인다.
+  if(range==='1h'||range==='1d'){
+   const h=await dbHistory(range);
+   if(!h.ok)throw Error(h.error||'D1 chart');
+
+   let p=dbRawPoints(h.points);
+
+   if(range==='1h'){
+    const cut=Date.now()-3600000;
+    p=p.filter(q=>q.t>=cut);
+   }else{
+    const cut=kstTodayStartMs();
+    p=p.filter(q=>q.t>=cut);
+   }
+
+   render(p);
+   status(p.length?`D1 차트 반영 · ${p.length.toLocaleString()}개`:'D1 데이터 누적 대기',p.length?true:null);
+   return;
+  }
+
+  // 5일/1개월 = 기존 Yahoo 과거 시계열 유지.
+  const h=await historyData(range);
+  if(!h.ok)throw Error(h.error||'chart');
+
+  const K=points(h.korea),U=points(h.skhy),X=points(h.fx);
+  let p=range==='1mo'
+    ? alignHourly(K,U,X)
+    : alignIntraday(K,U,X);
+
+  render(p);
+  status('과거차트 Worker 반영',true);
+
+ }catch(e){
+  console.error(e);
+  status('과거차트 조회 실패',false);
+ }
+}
 function pearson(a,b){if(a.length!==b.length||a.length<2)return null;const ma=a.reduce((s,v)=>s+v,0)/a.length,mb=b.reduce((s,v)=>s+v,0)/b.length;let n=0,da=0,db=0;for(let i=0;i<a.length;i++){const x=a[i]-ma,y=b[i]-mb;n+=x*y;da+=x*x;db+=y*y}const den=Math.sqrt(da*db);return den?n/den:null}
-function strength(r){const a=Math.abs(r);return a>=.8?'매우 강한':a>=.6?'강한':a>=.4?'중간 정도의':a>=.2?'약한':'거의 없는'}function direction(r){return r>=0?'양(+)의':'음(-)의'}
-async function loadCorr(){try{const h=await dbHistory('30d');if(!h.ok)throw Error(h.error||'corr');const d=analyticalPoints(h.points),levels={},rets={},now=d.at(-1)?.t||Date.now();for(const days of[5,10,20,30]){const cut=now-days*86400000,s=d.filter(v=>v.t>=cut);levels[days]=s.length>=12?pearson(s.map(v=>v.n),s.map(v=>v.x)):null;if(s.length>=13){const a=[],b=[];for(let i=1;i<s.length;i++){if(s[i-1].n>0&&s[i-1].x>0){a.push(s[i].n/s[i-1].n-1);b.push(s[i].x/s[i-1].x-1)}}rets[days]=a.length>=12?pearson(a,b):null}else rets[days]=null;$('level'+days).textContent=levels[days]==null?'—':`${levels[days]>=0?'+':''}${levels[days].toFixed(2)}`;$('return'+days).textContent=rets[days]==null?'—':`${rets[days]>=0?'+':''}${rets[days].toFixed(2)}`}const l=levels[20]??levels[10]??levels[5],r=rets[20]??rets[10]??rets[5];$('corrInterpretation').textContent=(l==null&&r==null)?'해석: 동일시각 분석 데이터가 아직 부족합니다.':(l!=null&&r!=null)?`해석: Level은 ${strength(l)} ${direction(l)} 상관, Return은 ${strength(r)} ${direction(r)} 상관입니다.`:`해석: 현재 계산 가능한 지표에서 ${strength(l??r)} ${direction(l??r)} 상관이 관찰됩니다.`}catch(e){console.error(e);$('corrInterpretation').textContent='해석: 동기화 Corr 데이터 조회 실패'}}
-document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});$('refresh').onclick=async()=>{await update();await loadChart();await loadCorr()};$('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율(현재 괴리): ${f2(last.n)}\n한국 SK하이닉스: ${f0(last.k)}원\nSKHY: $${f2(last.u)}\nUSD/KRW: ${f2(last.x)}\n0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
-async function boot(){await update();await loadChart();await loadCorr();setInterval(update,REFRESH);setInterval(loadChart,CHART_REFRESH);setInterval(loadCorr,CORR_REFRESH)}boot();
+function strength(r){const a=Math.abs(r);return a>=.8?'매우 강한':a>=.6?'강한':a>=.4?'중간 정도의':a>=.2?'약한':'거의 없는'}
+function direction(r){return r>=0?'양(+)의':'음(-)의'}
+async function loadCorr(){
+ try{
+  const h=await historyData('corr');if(!h.ok)throw Error(h.error||'corr');
+  const d=alignHourly(points(h.korea),points(h.skhy),points(h.fx));
+  const levels={},rets={};
+  const now=d.at(-1)?.t||Date.now();
+  for(const n of [5,10,20,30]){
+   const cut=now-n*86400000;
+   const s=d.filter(v=>v.t>=cut);
+   levels[n]=s.length>=12?pearson(s.map(v=>v.n),s.map(v=>v.x)):null;
+   if(s.length>=13){
+     const a=[],b=[];
+     for(let i=1;i<s.length;i++){
+       if(s[i-1].n>0&&s[i-1].x>0){
+         a.push(s[i].n/s[i-1].n-1);
+         b.push(s[i].x/s[i-1].x-1);
+       }
+     }
+     rets[n]=a.length>=12?pearson(a,b):null;
+   }else rets[n]=null;
+   $('level'+n).textContent=levels[n]==null?'—':`${levels[n]>=0?'+':''}${levels[n].toFixed(2)}`;
+   $('return'+n).textContent=rets[n]==null?'—':`${rets[n]>=0?'+':''}${rets[n].toFixed(2)}`;
+  }
+  const l=levels[20]??levels[10]??levels[5],r=rets[20]??rets[10]??rets[5];
+  $('corrInterpretation').textContent=(l==null&&r==null)?'해석: 상관계수를 계산할 데이터가 아직 부족합니다.':(l!=null&&r!=null)?`해석: Level은 ${strength(l)} ${direction(l)} 상관, Return은 ${strength(r)} ${direction(r)} 상관입니다.`:`해석: 현재 계산 가능한 지표에서 ${strength(l??r)} ${direction(l??r)} 상관이 관찰됩니다.`;
+ }catch(e){console.error(e);$('corrInterpretation').textContent='해석: Corr 데이터 조회 실패'}
+}
+
+document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
+$('refresh').onclick=()=>{update();loadChart();loadCorr()};
+$('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)}\n한국 SK하이닉스: ${f0(last.k)}원\nSKHY: $${f2(last.u)}\nUSD/KRW: ${f2(last.x)}\n0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
+
+update();loadChart();loadCorr();
+setInterval(update,REFRESH);
+setInterval(loadChart,60000);
+setInterval(loadCorr,300000);
 </script></body></html>
