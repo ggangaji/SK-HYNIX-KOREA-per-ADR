@@ -60,7 +60,7 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">v1.0: SKHY는 현재 미국 세션(오버나이트/프리/정규/애프터)을 표시하며 등락률도 해당 세션 시작값 대비로 전환됩니다. 일별 데이터는 CONFIRMED / LIVE_MATCHED / REFERENCE 품질등급으로 관리합니다.</div>
+<div class="note">v1.0: SKHY는 현재 미국 세션을 표시합니다. Overnight·Pre-market·Regular Market은 전일 정규장 종가 대비, After-hours는 당일 정규장 종가 대비 등락률을 표시합니다.</div>
 </section>
 </main>
 
@@ -304,8 +304,8 @@ async function update(){
 
   setChange('krchg',(kprev>0)?(kp/kprev-1)*100:null);
 
-  // v1.0: SKHY 등락률은 전일 정규장 종가 고정이 아니라 현재 미국 세션의 시작값 대비.
-  // Worker가 직접 수집한 LIVE_WEBSOCKET 계열의 해당 세션 첫 틱을 기준으로 계산한다.
+  // v1.0: SKHY 등락률은 세션에 맞는 정규장 종가 기준.
+  // Overnight / Pre-market / Regular = 전일 종가 대비, After-hours = 당일 정규장 종가 대비.
   const sessionPct=Number(c.skhyChangePercent);
   setChange('uschg',Number.isFinite(sessionPct)?sessionPct:null);
 
