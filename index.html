@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v0.92</title>
+<title>닉스환율 지표추적자 v0.93</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -24,7 +24,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v0.92 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v0.93 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -60,7 +60,7 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">v0.92: 모든 가격 기준시각은 한국시간(KST)으로 표시합니다. 1시간·오늘은 D1 1분 누적값을 사용하며 자동 갱신 시 기간과 범례 상태를 유지합니다.</div>
+<div class="note">v0.93: 닉스환율·차트·Corr는 모두 동일시각 동기화 데이터만 사용합니다. 세 가격의 기준시각은 KST로 통일하며 매칭 허용오차는 ±90초입니다.</div>
 </section>
 </main>
 
@@ -79,6 +79,8 @@ async function jget(url, timeout=18000){
 }
 async function historyData(preset){return jget(`${WORKER}/history?preset=${preset}`)}
 async function dbHistory(range){return jget(`${WORKER}/db-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
+async function latestSync(){return jget(`${WORKER}/latest-sync?t=${Date.now()}`,20000)}
+async function syncHistory(range){return jget(`${WORKER}/sync-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
 async function wsPrice(){try{return await jget(WORKER,17000)}catch{return null}}
 
 function points(o){return (o?.points||[]).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v))}
@@ -126,14 +128,19 @@ function alignIntraday(K,U,X){
 }
 
 
-function dbRawPoints(rows){
+function syncPoints(rows){
  return (rows||[])
   .map(r=>({
     t:Number(r.timestamp),
     n:Number(r.nyx_rate),
     x:Number(r.usdkrw)
   }))
-  .filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.n)&&Number.isFinite(p.x)&&p.n>0&&p.x>0)
+  .filter(p=>
+    Number.isFinite(p.t)&&
+    Number.isFinite(p.n)&&
+    Number.isFinite(p.x)&&
+    p.n>0&&p.x>0
+  )
   .sort((a,b)=>a.t-b.t);
 }
 
@@ -266,28 +273,27 @@ function usSession(){
 
 async function update(){
  try{
-  status('현재가 조회 중…');
+  status('동일시각 데이터 조회 중…');
 
-  const [h,ws]=await Promise.all([historyData('1d'),wsPrice()]);
+  // 가격과 등락률 기준값(previousClose)만 Yahoo history에서 읽고,
+  // 실제 표시 가격과 닉스환율 계산은 반드시 /latest-sync의 동일시각 값만 사용한다.
+  const [h,s]=await Promise.all([
+    historyData('1d'),
+    latestSync()
+  ]);
+
   if(!h.ok)throw Error(h.error||'history');
+  if(!s.ok)throw Error(s.error||'동일시각 데이터 없음');
 
-  const kq=quoteFromHistory(h.korea);
-  const xq=quoteFromHistory(h.fx);
-  const uqFallback=quoteFromHistory(h.skhy);
+  const kp=Number(s.krPrice);
+  const up=Number(s.skhyPrice);
+  const xp=Number(s.usdkrw);
+  const n=Number(s.nyxRate);
+  const commonTs=Number(s.syncTimestamp);
 
-  const kp=Number(kq.price);
-  const xp=Number(xq.price);
-
-  const wsPriceOk=ws?.received&&Number.isFinite(+ws.price)&&(+ws.price)>0;
-  const up=wsPriceOk ? +ws.price : Number(uqFallback.price);
-
-  const krTs=Number(kq.timestamp)||null;
-  const fxTs=Number(xq.timestamp)||null;
-  const usTs=wsPriceOk
-    ? (Number(ws.timestamp)>0 ? Number(ws.timestamp) : Date.now())
-    : (Number(uqFallback.timestamp)||null);
-
-  if(!(kp>0&&up>0&&xp>0))throw Error('현재가 부족');
+  if(!(kp>0&&up>0&&xp>0&&n>0&&commonTs>0)){
+    throw Error('동일시각 데이터 부족');
+  }
 
   const kprev=Number(h.korea?.previousClose);
   const xprev=Number(h.fx?.previousClose);
@@ -295,15 +301,19 @@ async function update(){
 
   const kchg=(kprev>0)?(kp/kprev-1)*100:null;
   const xchg=(xprev>0)?(xp/xprev-1)*100:null;
-  const uchg=(wsPriceOk&&Number.isFinite(+ws.changePercent))
-    ? +ws.changePercent
-    : ((uprev>0)?(up/uprev-1)*100:null);
+  const uchg=(uprev>0)?(up/uprev-1)*100:null;
 
-  const n=.1*kp/up;
   const d=n-xp;
   const p=d/xp*100;
 
-  last={k:kp,u:up,x:xp,n,krTs,usTs,fxTs};
+  // 세 가격은 모두 같은 syncTimestamp 기준.
+  last={
+    k:kp,u:up,x:xp,n,
+    krTs:commonTs,
+    usTs:commonTs,
+    fxTs:commonTs,
+    syncTs:commonTs
+  };
 
   $('result').textContent=f2(n);
   $('kr').textContent=f0(kp)+'원';
@@ -314,28 +324,29 @@ async function update(){
   setChange('uschg',uchg);
   setChange('fxchg',xchg);
 
-  $('ks').textContent=koreaSessionForQuote(krTs);
-  $('uss').textContent=usSession();
+  $('ks').textContent=`동일시각 · ${koreaSessionForQuote(commonTs)}`;
+  $('uss').textContent='동일시각 동기화값';
 
-  $('krtime').textContent=formatKstBasis(krTs);
-  $('ustime').textContent=formatKstBasis(usTs);
-  $('fxtime').textContent=formatKstBasis(fxTs);
+  const basis=formatKstBasis(commonTs);
+  $('krtime').textContent=basis;
+  $('ustime').textContent=basis;
+  $('fxtime').textContent=basis;
 
   $('diff').textContent=`${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)`;
   $('diff').style.color=d>0?'#35c98a':d<0?'#ff6677':'#95a1b2';
 
-  $('formula').textContent=`0.1 × ${f0(kp)} ÷ ${f2(up)} = ${f2(n)}`;
+  $('formula').textContent=`0.1 × ${f0(kp)} ÷ ${f2(up)} = ${f2(n)} · ${basis}`;
 
   const now=kstParts();
   $('updated').textContent=now
     ? `조회 ${String(now.hour).padStart(2,'0')}:${String(now.minute).padStart(2,'0')}:${String(now.second).padStart(2,'0')}`
     : '조회 --';
 
-  status(wsPriceOk?'SKHY Yahoo WebSocket 반영':'Worker 최근가 반영',true);
+  status(`동일시각 데이터 반영 · 허용오차 ±90초`,true);
 
  }catch(e){
   console.error(e);
-  status('현재가 조회 실패',false);
+  status('동일시각 데이터 조회 실패',false);
  }
 }
 
@@ -384,45 +395,33 @@ function render(p){
 }
 async function loadChart(){
  try{
-  status('차트 조회 중…');
+  status('동일시각 차트 조회 중…');
 
-  // v0.91:
-  // 1시간/오늘 = D1에 실제로 매분 저장된 "현재 괴리" 시계열 사용.
-  // 한국장이 끝난 뒤에도 SKHY가 움직이면 닉스환율 곡선이 계속 움직인다.
-  if(range==='1h'||range==='1d'){
-   const h=await dbHistory(range);
-   if(!h.ok)throw Error(h.error||'D1 chart');
+  const h=await syncHistory(range);
+  if(!h.ok)throw Error(h.error||'sync chart');
 
-   let p=dbRawPoints(h.points);
+  let p=syncPoints(h.points);
 
-   if(range==='1h'){
+  if(range==='1h'){
     const cut=Date.now()-3600000;
     p=p.filter(q=>q.t>=cut);
-   }else{
+  }else if(range==='1d'){
     const cut=kstTodayStartMs();
     p=p.filter(q=>q.t>=cut);
-   }
-
-   render(p);
-   status(p.length?`D1 차트 반영 · ${p.length.toLocaleString()}개`:'D1 데이터 누적 대기',p.length?true:null);
-   return;
   }
 
-  // 5일/1개월 = 기존 Yahoo 과거 시계열 유지.
-  const h=await historyData(range);
-  if(!h.ok)throw Error(h.error||'chart');
-
-  const K=points(h.korea),U=points(h.skhy),X=points(h.fx);
-  let p=range==='1mo'
-    ? alignHourly(K,U,X)
-    : alignIntraday(K,U,X);
-
   render(p);
-  status('과거차트 Worker 반영',true);
+
+  status(
+    p.length
+      ? `동일시각 차트 · ${p.length.toLocaleString()}개 · ±${h.syncToleranceSeconds||90}초`
+      : '동일시각 데이터 누적 대기',
+    p.length?true:null
+  );
 
  }catch(e){
   console.error(e);
-  status('과거차트 조회 실패',false);
+  status('동일시각 차트 조회 실패',false);
  }
 }
 function pearson(a,b){if(a.length!==b.length||a.length<2)return null;const ma=a.reduce((s,v)=>s+v,0)/a.length,mb=b.reduce((s,v)=>s+v,0)/b.length;let n=0,da=0,db=0;for(let i=0;i<a.length;i++){const x=a[i]-ma,y=b[i]-mb;n+=x*y;da+=x*x;db+=y*y}const den=Math.sqrt(da*db);return den?n/den:null}
@@ -430,35 +429,58 @@ function strength(r){const a=Math.abs(r);return a>=.8?'매우 강한':a>=.6?'강
 function direction(r){return r>=0?'양(+)의':'음(-)의'}
 async function loadCorr(){
  try{
-  const h=await historyData('corr');if(!h.ok)throw Error(h.error||'corr');
-  const d=alignHourly(points(h.korea),points(h.skhy),points(h.fx));
+  const h=await syncHistory('30d');
+  if(!h.ok)throw Error(h.error||'sync corr');
+
+  const d=syncPoints(h.points);
   const levels={},rets={};
   const now=d.at(-1)?.t||Date.now();
+
   for(const n of [5,10,20,30]){
    const cut=now-n*86400000;
    const s=d.filter(v=>v.t>=cut);
-   levels[n]=s.length>=12?pearson(s.map(v=>v.n),s.map(v=>v.x)):null;
+
+   levels[n]=s.length>=12
+    ? pearson(s.map(v=>v.n),s.map(v=>v.x))
+    : null;
+
    if(s.length>=13){
-     const a=[],b=[];
-     for(let i=1;i<s.length;i++){
-       if(s[i-1].n>0&&s[i-1].x>0){
-         a.push(s[i].n/s[i-1].n-1);
-         b.push(s[i].x/s[i-1].x-1);
-       }
+    const a=[],b=[];
+    for(let i=1;i<s.length;i++){
+     if(s[i-1].n>0&&s[i-1].x>0){
+      a.push(s[i].n/s[i-1].n-1);
+      b.push(s[i].x/s[i-1].x-1);
      }
-     rets[n]=a.length>=12?pearson(a,b):null;
+    }
+    rets[n]=a.length>=12?pearson(a,b):null;
    }else rets[n]=null;
-   $('level'+n).textContent=levels[n]==null?'—':`${levels[n]>=0?'+':''}${levels[n].toFixed(2)}`;
-   $('return'+n).textContent=rets[n]==null?'—':`${rets[n]>=0?'+':''}${rets[n].toFixed(2)}`;
+
+   $('level'+n).textContent=
+    levels[n]==null?'—':`${levels[n]>=0?'+':''}${levels[n].toFixed(2)}`;
+
+   $('return'+n).textContent=
+    rets[n]==null?'—':`${rets[n]>=0?'+':''}${rets[n].toFixed(2)}`;
   }
-  const l=levels[20]??levels[10]??levels[5],r=rets[20]??rets[10]??rets[5];
-  $('corrInterpretation').textContent=(l==null&&r==null)?'해석: 상관계수를 계산할 데이터가 아직 부족합니다.':(l!=null&&r!=null)?`해석: Level은 ${strength(l)} ${direction(l)} 상관, Return은 ${strength(r)} ${direction(r)} 상관입니다.`:`해석: 현재 계산 가능한 지표에서 ${strength(l??r)} ${direction(l??r)} 상관이 관찰됩니다.`;
- }catch(e){console.error(e);$('corrInterpretation').textContent='해석: Corr 데이터 조회 실패'}
+
+  const l=levels[20]??levels[10]??levels[5];
+  const r=rets[20]??rets[10]??rets[5];
+
+  $('corrInterpretation').textContent=
+   (l==null&&r==null)
+    ? '해석: 동일시각 데이터가 아직 충분히 누적되지 않았습니다.'
+    : (l!=null&&r!=null)
+      ? `해석: Level은 ${strength(l)} ${direction(l)} 상관, Return은 ${strength(r)} ${direction(r)} 상관입니다.`
+      : `해석: 현재 계산 가능한 지표에서 ${strength(l??r)} ${direction(l??r)} 상관이 관찰됩니다.`;
+
+ }catch(e){
+  console.error(e);
+  $('corrInterpretation').textContent='해석: 동일시각 Corr 데이터 조회 실패';
+ }
 }
 
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
 $('refresh').onclick=()=>{update();loadChart();loadCorr()};
-$('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)}
+$('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율(동일시각): ${f2(last.n)}
 한국 SK하이닉스: ${f0(last.k)}원 (${formatKstBasis(last.krTs)})
 SKHY: $${f2(last.u)} (${formatKstBasis(last.usTs)})
 USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
