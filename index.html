@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v0.95</title>
+<title>닉스환율 지표추적자 v0.96</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -24,7 +24,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v0.95 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v0.96 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -60,7 +60,7 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">v0.95: 장중 메인값은 동일시각, 장 마감 후에는 한국 종가를 고정하고 현재 SKHY를 반영합니다. Corr는 동일시각 데이터만 사용하며 '일별종가'는 매 거래일 15:30 KST 기준입니다.</div>
+<div class="note">v0.96: '일별종가'는 전용 DB에 저장된 매 거래일 15:30 KST 기준값을 사용합니다. 7/10 이후 과거 구간은 백필할 수 있으며, 복원 불가능한 날짜는 억지로 채우지 않습니다.</div>
 </section>
 </main>
 
