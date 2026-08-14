@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v0.91</title>
+<title>닉스환율 지표추적자 v0.92</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -24,15 +24,15 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v0.91 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v0.92 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
 <div class="grid">
- <div class="box"><div class="label">🇰🇷 SK하이닉스 · 000660</div><div class="price"><span id="kr">--</span><span class="chg flat" id="krchg">--</span></div><div class="session" id="ks">--</div></div>
- <div class="box"><div class="label">🇺🇸 SKHY · NASDAQ</div><div class="price"><span id="us">--</span><span class="chg flat" id="uschg">--</span></div><div class="session" id="uss">--</div></div>
+ <div class="box"><div class="label">🇰🇷 SK하이닉스 · 000660</div><div class="price"><span id="kr">--</span><span class="chg flat" id="krchg">--</span></div><div class="session" id="ks">--</div><div class="basis" id="krtime">-- 기준</div></div>
+ <div class="box"><div class="label">🇺🇸 SKHY · NASDAQ</div><div class="price"><span id="us">--</span><span class="chg flat" id="uschg">--</span></div><div class="session" id="uss">--</div><div class="basis" id="ustime">-- 기준</div></div>
 </div>
-<div class="fx"><div><div class="label">💱 USD/KRW</div><div class="price"><span id="fx">--</span><span class="chg flat" id="fxchg">--</span></div></div><div class="right"><div class="label">닉스환율 − USD/KRW</div><div class="diff" id="diff">--</div></div></div>
+<div class="fx"><div><div class="label">💱 USD/KRW</div><div class="price"><span id="fx">--</span><span class="chg flat" id="fxchg">--</span></div><div class="basis" id="fxtime">-- 기준</div></div><div class="right"><div class="label">닉스환율 − USD/KRW</div><div class="diff" id="diff">--</div></div></div>
 <div class="formula" id="formula">0.1 × -- ÷ --</div>
 <div class="meta"><div><span class="dot" id="dot"></span><span id="status">조회 대기</span></div><div id="updated">--</div></div>
 <div class="actions"><button class="primary" id="refresh">지금 새로고침</button><button id="copy">게시판용 문구 복사</button></div>
@@ -60,7 +60,7 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">v0.91: 1시간·오늘은 D1 1분 누적값을, 5일·1개월은 과거 시계열을 사용합니다. 자동 갱신 시 기간과 범례 표시 상태를 유지합니다.</div>
+<div class="note">v0.92: 모든 가격 기준시각은 한국시간(KST)으로 표시합니다. 1시간·오늘은 D1 1분 누적값을 사용하며 자동 갱신 시 기간과 범례 상태를 유지합니다.</div>
 </section>
 </main>
 
@@ -171,52 +171,172 @@ function setChange(id,pct){
  el.textContent=(pct>0?'+':'')+pct.toFixed(2)+'%';
  el.className='chg '+(pct>0?'up':pct<0?'down':'flat');
 }
-function koreaSession(){
+function kstParts(timestamp=Date.now()){
  try{
   const p=new Intl.DateTimeFormat('en-US',{
-    timeZone:'Asia/Seoul',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false
-  }).formatToParts(new Date());
+   timeZone:'Asia/Seoul',
+   year:'numeric',month:'2-digit',day:'2-digit',
+   weekday:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',
+   hour12:false
+  }).formatToParts(new Date(timestamp));
   const q=Object.fromEntries(p.map(x=>[x.type,x.value]));
-  if(q.weekday==='Sat'||q.weekday==='Sun')return'장 마감 / 종가';
-  let h=+q.hour;if(h===24)h=0;
-  const m=h*60+(+q.minute);
-  return (m>=540&&m<930)?'KRX 정규장 / 현재가':'장 마감 / 종가';
- }catch{return'KRX'}
+  let h=Number(q.hour); if(h===24)h=0;
+  return {
+   year:Number(q.year),month:Number(q.month),day:Number(q.day),
+   weekday:q.weekday,hour:h,minute:Number(q.minute),second:Number(q.second)
+  };
+ }catch{return null}
+}
+
+function sameKstDate(a,b=Date.now()){
+ const x=kstParts(a),y=kstParts(b);
+ return !!(x&&y&&x.year===y.year&&x.month===y.month&&x.day===y.day);
+}
+
+function kstMinutes(timestamp){
+ const q=kstParts(timestamp);
+ return q ? q.hour*60+q.minute : null;
+}
+
+function formatKstBasis(timestamp){
+ const t=Number(timestamp);
+ if(!Number.isFinite(t)||t<=0)return '-- 기준';
+ const q=kstParts(t);
+ if(!q)return '-- 기준';
+ const hh=String(q.hour).padStart(2,'0');
+ const mm=String(q.minute).padStart(2,'0');
+ return sameKstDate(t)
+  ? `${hh}:${mm} 기준`
+  : `${q.month}/${q.day} ${hh}:${mm} 기준`;
+}
+
+function quoteFromHistory(obj){
+ const pts=points(obj);
+ const metaPrice=Number(obj?.regularMarketPrice);
+ const metaTime=Number(obj?.regularMarketTime);
+ if(metaPrice>0 && metaTime>0){
+  return {price:metaPrice,timestamp:metaTime};
+ }
+ const last=pts.at(-1);
+ return {price:Number(last?.v),timestamp:Number(last?.t)||null};
+}
+
+function koreaSessionForQuote(quoteTimestamp){
+ const now=kstParts();
+ if(!now)return 'KRX';
+
+ const weekend=now.weekday==='Sat'||now.weekday==='Sun';
+ if(weekend)return '휴장 / 최근 종가';
+
+ const m=now.hour*60+now.minute;
+
+ if(m<540)return '장 시작 전 / 최근 종가';
+ if(m>=540&&m<920)return 'KRX 20분 지연';
+ if(m>=920&&m<930)return '종가 동시호가 · KRX 20분 지연';
+
+ // 15:30 이후: "시간"만으로 종가라고 단정하지 않는다.
+ // 오늘 데이터의 실제 timestamp가 15:30 이상일 때만 종가 확정.
+ const qm=kstMinutes(quoteTimestamp);
+ const finalConfirmed=
+   Number.isFinite(Number(quoteTimestamp)) &&
+   sameKstDate(Number(quoteTimestamp)) &&
+   qm!==null && qm>=930;
+
+ return finalConfirmed
+  ? '장 마감 / 종가'
+  : '장 마감 / 종가 반영 대기';
 }
 
 function usSession(){
- try{const p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(new Date()),q=Object.fromEntries(p.map(x=>[x.type,x.value]));if(q.weekday==='Sat'||q.weekday==='Sun')return'미국장 휴장 / 최근가';let h=+q.hour;if(h===24)h=0;const m=h*60+(+q.minute);if(m>=240&&m<570)return'Pre-market';if(m>=570&&m<960)return'Regular Market';if(m>=960&&m<1200)return'After-hours';return'BOATS / Overnight'}catch{return'최근가'}
+ try{
+  const p=new Intl.DateTimeFormat('en-US',{
+   timeZone:'America/New_York',weekday:'short',
+   hour:'2-digit',minute:'2-digit',hour12:false
+  }).formatToParts(new Date());
+  const q=Object.fromEntries(p.map(x=>[x.type,x.value]));
+  if(q.weekday==='Sat'||q.weekday==='Sun')return'미국장 휴장 / 최근가';
+  let h=+q.hour;if(h===24)h=0;
+  const m=h*60+(+q.minute);
+  if(m>=240&&m<570)return'Pre-market';
+  if(m>=570&&m<960)return'Regular Market';
+  if(m>=960&&m<1200)return'After-hours';
+  return'BOATS / Overnight';
+ }catch{return'최근가'}
 }
 
 async function update(){
  try{
   status('현재가 조회 중…');
+
   const [h,ws]=await Promise.all([historyData('1d'),wsPrice()]);
   if(!h.ok)throw Error(h.error||'history');
-  const kp=Number(h.korea?.regularMarketPrice)||points(h.korea).at(-1)?.v;
-  const xp=Number(h.fx?.regularMarketPrice)||points(h.fx).at(-1)?.v;
-  const fallbackU=Number(h.skhy?.regularMarketPrice)||points(h.skhy).at(-1)?.v;
-  const up=(ws?.received&&Number.isFinite(+ws.price))?+ws.price:fallbackU;
+
+  const kq=quoteFromHistory(h.korea);
+  const xq=quoteFromHistory(h.fx);
+  const uqFallback=quoteFromHistory(h.skhy);
+
+  const kp=Number(kq.price);
+  const xp=Number(xq.price);
+
+  const wsPriceOk=ws?.received&&Number.isFinite(+ws.price)&&(+ws.price)>0;
+  const up=wsPriceOk ? +ws.price : Number(uqFallback.price);
+
+  const krTs=Number(kq.timestamp)||null;
+  const fxTs=Number(xq.timestamp)||null;
+  const usTs=wsPriceOk
+    ? (Number(ws.timestamp)>0 ? Number(ws.timestamp) : Date.now())
+    : (Number(uqFallback.timestamp)||null);
+
   if(!(kp>0&&up>0&&xp>0))throw Error('현재가 부족');
 
   const kprev=Number(h.korea?.previousClose);
   const xprev=Number(h.fx?.previousClose);
   const uprev=Number(h.skhy?.previousClose);
+
   const kchg=(kprev>0)?(kp/kprev-1)*100:null;
   const xchg=(xprev>0)?(xp/xprev-1)*100:null;
-  const uchg=(ws?.received&&Number.isFinite(+ws.changePercent))
+  const uchg=(wsPriceOk&&Number.isFinite(+ws.changePercent))
     ? +ws.changePercent
     : ((uprev>0)?(up/uprev-1)*100:null);
 
-  const n=.1*kp/up,d=n-xp,p=d/xp*100;last={k:kp,u:up,x:xp,n};
-  $('result').textContent=f2(n);$('kr').textContent=f0(kp)+'원';$('us').textContent='$'+f2(up);$('fx').textContent=f2(xp);
-  setChange('krchg',kchg);setChange('uschg',uchg);setChange('fxchg',xchg);
-  $('ks').textContent=koreaSession();$('uss').textContent=usSession();
-  $('diff').textContent=`${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)`;$('diff').style.color=d>0?'#35c98a':d<0?'#ff6677':'#95a1b2';
+  const n=.1*kp/up;
+  const d=n-xp;
+  const p=d/xp*100;
+
+  last={k:kp,u:up,x:xp,n,krTs,usTs,fxTs};
+
+  $('result').textContent=f2(n);
+  $('kr').textContent=f0(kp)+'원';
+  $('us').textContent='$'+f2(up);
+  $('fx').textContent=f2(xp);
+
+  setChange('krchg',kchg);
+  setChange('uschg',uchg);
+  setChange('fxchg',xchg);
+
+  $('ks').textContent=koreaSessionForQuote(krTs);
+  $('uss').textContent=usSession();
+
+  $('krtime').textContent=formatKstBasis(krTs);
+  $('ustime').textContent=formatKstBasis(usTs);
+  $('fxtime').textContent=formatKstBasis(fxTs);
+
+  $('diff').textContent=`${d>=0?'+':''}${f2(d)} (${p>=0?'+':''}${p.toFixed(2)}%)`;
+  $('diff').style.color=d>0?'#35c98a':d<0?'#ff6677':'#95a1b2';
+
   $('formula').textContent=`0.1 × ${f0(kp)} ÷ ${f2(up)} = ${f2(n)}`;
-  $('updated').textContent=new Date().toLocaleTimeString('ko-KR',{hour12:false});
-  status(ws?.received?'SKHY Yahoo WebSocket 반영':'Worker 최근가 반영',true);
- }catch(e){console.error(e);status('현재가 조회 실패',false)}
+
+  const now=kstParts();
+  $('updated').textContent=now
+    ? `조회 ${String(now.hour).padStart(2,'0')}:${String(now.minute).padStart(2,'0')}:${String(now.second).padStart(2,'0')}`
+    : '조회 --';
+
+  status(wsPriceOk?'SKHY Yahoo WebSocket 반영':'Worker 최근가 반영',true);
+
+ }catch(e){
+  console.error(e);
+  status('현재가 조회 실패',false);
+ }
 }
 
 function render(p){
@@ -338,7 +458,11 @@ async function loadCorr(){
 
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
 $('refresh').onclick=()=>{update();loadChart();loadCorr()};
-$('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)}\n한국 SK하이닉스: ${f0(last.k)}원\nSKHY: $${f2(last.u)}\nUSD/KRW: ${f2(last.x)}\n0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
+$('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)}
+한국 SK하이닉스: ${f0(last.k)}원 (${formatKstBasis(last.krTs)})
+SKHY: $${f2(last.u)} (${formatKstBasis(last.usTs)})
+USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
+0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 update();loadChart();loadCorr();
 setInterval(update,REFRESH);
