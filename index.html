@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.0</title>
+<title>닉스환율 지표추적자 v1.01</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -24,7 +24,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.0 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.01 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -60,13 +60,22 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">v1.0: SKHY는 현재 미국 세션을 표시합니다. Overnight·Pre-market·Regular Market은 전일 정규장 종가 대비, After-hours는 당일 정규장 종가 대비 등락률을 표시합니다.</div>
+<div class="note">v1.01 D1 절약형: 현재값은 15초 갱신, 1시간/오늘 차트만 5분 자동 갱신, 5일·1개월·일별종가는 선택 시에만 조회합니다. Corr는 1시간 간격으로 갱신합니다.</div>
 </section>
 </main>
 
 <script>
 const WORKER='https://nyx-rate-proxy.duienugu.workers.dev', REFRESH=15000, $=id=>document.getElementById(id);
 let range='1mo', chart=null, last=null;
+let historyCache=null, historyCacheAt=0;
+async function historyDataCached(){
+  const now=Date.now();
+  if(historyCache && now-historyCacheAt<300000)return historyCache;
+  const h=await historyDataCached();
+  if(h?.ok){historyCache=h;historyCacheAt=now;}
+  return h;
+}
+
 
 const f0=n=>Number(n).toLocaleString('ko-KR',{maximumFractionDigits:0});
 const f2=n=>Number(n).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -277,13 +286,20 @@ async function update(){
  try{
   status('현재 닉스환율 조회 중…');
 
-  const [h,c]=await Promise.all([
-    historyData('1d'),
-    currentRate()
-  ]);
-
-  if(!h.ok)throw Error(h.error||'history');
+  // v1.0 FIX:
+  // /current-rate는 메인 데이터.
+  // /history는 KR/FX 등락률 계산용 보조 데이터이므로,
+  // Yahoo history 조회가 실패해도 현재 닉스환율 화면 전체를 죽이지 않는다.
+  const c=await currentRate();
   if(!c.ok)throw Error(c.error||'current rate');
+
+  let h=null;
+  try{
+    const hh=await historyDataCached();
+    if(hh?.ok)h=hh;
+  }catch(e){
+    console.warn('optional history fetch failed',e);
+  }
 
   const kp=Number(c.krPrice);
   const up=Number(c.skhyPrice);
@@ -298,18 +314,17 @@ async function update(){
     throw Error('현재 닉스환율 데이터 부족');
   }
 
-  const kprev=Number(h.korea?.previousClose);
-  const xprev=Number(h.fx?.previousClose);
-  const uprev=Number(h.skhy?.previousClose);
+  // KR/FX 등락률은 Yahoo history가 성공했을 때만 계산.
+  // 실패하면 -- 만 표시하고 가격/닉스환율은 정상 표시한다.
+  const kprev=Number(h?.korea?.previousClose);
+  const xprev=Number(h?.fx?.previousClose);
 
   setChange('krchg',(kprev>0)?(kp/kprev-1)*100:null);
+  setChange('fxchg',(xprev>0)?(xp/xprev-1)*100:null);
 
-  // v1.0: SKHY 등락률은 세션에 맞는 정규장 종가 기준.
-  // Overnight / Pre-market / Regular = 전일 종가 대비, After-hours = 당일 정규장 종가 대비.
+  // SKHY 등락률은 Worker /current-rate가 계산한 값을 사용.
   const sessionPct=Number(c.skhyChangePercent);
   setChange('uschg',Number.isFinite(sessionPct)?sessionPct:null);
-
-  setChange('fxchg',(xprev>0)?(xp/xprev-1)*100:null);
 
   const d=n-xp;
   const p=d/xp*100;
@@ -348,10 +363,12 @@ async function update(){
     ? `조회 ${String(now.hour).padStart(2,'0')}:${String(now.minute).padStart(2,'0')}:${String(now.second).padStart(2,'0')}`
     : '조회 --';
 
+  const optionalHistoryFailed=!h;
+
   status(
     c.mode==='SYNCHRONIZED_INTRADAY'
-      ? '장중 동일시각 데이터 반영 · 허용오차 ±90초'
-      : '한국 종가 고정 · 현재 SKHY 반영',
+      ? `장중 동일시각 데이터 반영 · 허용오차 ±90초${optionalHistoryFailed?' · KR/FX 등락률 보조조회 실패':''}`
+      : `한국 종가 고정 · 현재 SKHY 반영${optionalHistoryFailed?' · KR/FX 등락률 보조조회 실패':''}`,
     true
   );
 
@@ -530,6 +547,8 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 
 update();loadChart();loadCorr();
 setInterval(update,REFRESH);
-setInterval(loadChart,60000);
-setInterval(loadCorr,300000);
+setInterval(()=>{
+  if(range==='1h'||range==='1d')loadChart();
+},300000);
+setInterval(loadCorr,3600000);
 </script></body></html>
