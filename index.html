@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.02</title>
+<title>닉스환율 지표추적자 v1.03</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -24,7 +24,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.02 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.03 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -60,7 +60,7 @@
 </div>
 <div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
 </div>
-<div class="note">v1.02: D1 절약 구조를 유지하면서 KR/FX 등락률 캐시 버그를 수정했고, 한국 종가가 늦게 반영되어도 15:30 LIVE 원천값으로 일별 종가를 자동 복구합니다.</div>
+<div class="note">v1.03: 미국 증시 공식 휴장일에는 SKHY 직전 정규장 종가를 사용해 한국장 15:30 일별값을 이어가며 US_CLOSED로 구분합니다.</div>
 </section>
 </main>
 
@@ -444,7 +444,7 @@ async function loadChart(){
     render(p);
     status(
       p.length
-        ? (()=>{const c=p.filter(v=>v.q==='CONFIRMED').length;const l=p.filter(v=>v.q==='LIVE_MATCHED').length;const r=p.filter(v=>v.q==='REFERENCE').length;return `일별 기준 · 확정 ${c} · LIVE복구 ${l} · 참고 ${r}`})()
+        ? (()=>{const c=p.filter(v=>v.q==='CONFIRMED').length;const l=p.filter(v=>v.q==='LIVE_MATCHED').length;const u=p.filter(v=>v.q==='US_CLOSED').length;const r=p.filter(v=>v.q==='REFERENCE').length;return `일별 기준 · 확정 ${c} · LIVE복구 ${l} · 미국휴장 ${u} · 참고 ${r}`})()
         : '일별 데이터 누적 대기',
       p.length?true:null
     );
