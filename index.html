@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.03</title>
+<title>닉스환율 지표추적자 v1.04</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -24,7 +24,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.03 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -38,8 +38,8 @@
 <div class="actions"><button class="primary" id="refresh">지금 새로고침</button><button id="copy">게시판용 문구 복사</button></div>
 </section>
 
-<section class="panel"><h2>닉스환율 추이</h2>
-<div class="ranges"><button data-r="1h">1시간</button><button data-r="1d">오늘</button><button data-r="5d">5일</button><button data-r="1mo" class="active">1개월</button><button data-r="daily">일별종가</button></div>
+<section class="panel"><h2>닉스환율 일별종가 추이</h2>
+<div class="ranges"><button data-r="all">전체</button><button data-r="1mo" class="active">1개월</button><button data-r="1w">1주일</button></div>
 <div class="chart"><canvas id="chart"></canvas></div>
 
 <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:14px">
@@ -422,69 +422,31 @@ function render(p){
  chart.data.datasets[1].data=fxData;
  chart.update('none');
 }
-async function loadChart(){
- try{
-  status('차트 조회 중…');
-
-  if(range==='daily'){
-    try{await repairDailyClose()}catch(e){console.warn('daily close repair skipped',e)}
-    const h=await dailyClose(60);
-    if(!h.ok)throw Error(h.error||'daily close');
-
-    const p=(h.points||[])
-      .map(r=>({
-        t:Number(r.timestamp),
-        n:Number(r.nyx_rate),
-        x:Number(r.usdkrw),
-        q:r.quality||'REFERENCE'
-      }))
-      .filter(q=>Number.isFinite(q.t)&&q.n>0&&q.x>0)
-      .sort((a,b)=>a.t-b.t);
-
-    render(p);
-    status(
-      p.length
-        ? (()=>{const c=p.filter(v=>v.q==='CONFIRMED').length;const l=p.filter(v=>v.q==='LIVE_MATCHED').length;const u=p.filter(v=>v.q==='US_CLOSED').length;const r=p.filter(v=>v.q==='REFERENCE').length;return `일별 기준 · 확정 ${c} · LIVE복구 ${l} · 미국휴장 ${u} · 참고 ${r}`})()
-        : '일별 데이터 누적 대기',
-      p.length?true:null
-    );
-    return;
-  }
-
-  // 일반 추이 그래프는 실제 사용자가 보는 "현재 닉스환율"의 흐름.
-  // 한국장이 닫힌 동안에는 kr_price가 종가로 고정되고 SKHY가 움직이며 nyx_rate가 변한다.
-  const dbRange=range==='1mo'?'1mo':range;
-  const h=await dbHistory(dbRange);
-  if(!h.ok)throw Error(h.error||'db chart');
-
-  let p=(h.points||[])
-    .map(r=>({
-      t:Number(r.timestamp),
-      n:Number(r.nyx_rate),
-      x:Number(r.usdkrw)
-    }))
-    .filter(q=>Number.isFinite(q.t)&&q.n>0&&q.x>0)
-    .sort((a,b)=>a.t-b.t);
-
-  if(range==='1h'){
-    p=p.filter(q=>q.t>=Date.now()-3600000);
-  }else if(range==='1d'){
-    p=p.filter(q=>q.t>=kstTodayStartMs());
-  }
-
-  render(p);
-  status(
-    p.length
-      ? `현재 닉스환율 추이 · ${p.length.toLocaleString()}개`
-      : '차트 데이터 누적 대기',
-    p.length?true:null
-  );
-
- }catch(e){
-  console.error(e);
-  status('차트 조회 실패',false);
- }
+let dailyPointsCache=null, dailyPointsCacheAt=0;
+async function loadDailyPoints(force=false){
+  if(!force && dailyPointsCache && Date.now()-dailyPointsCacheAt<300000)return dailyPointsCache;
+  const h=await dailyClose(3650);
+  if(!h.ok)throw Error(h.error||'daily close');
+  const p=(h.points||[]).map(r=>({
+    t:Number(r.timestamp),n:Number(r.nyx_rate),x:Number(r.usdkrw),
+    q:r.quality||'REFERENCE',date:r.date
+  })).filter(q=>Number.isFinite(q.t)&&q.n>0&&q.x>0).sort((a,b)=>a.t-b.t);
+  dailyPointsCache=p;dailyPointsCacheAt=Date.now();return p;
 }
+async function loadChart(force=false){
+ try{
+  const all=await loadDailyPoints(force);
+  const now=Date.now();
+  const cutoff=range==='1w'?now-7*86400000:range==='1mo'?now-30*86400000:0;
+  const p=all.filter(q=>q.t>=cutoff);
+  render(p);
+  const confirmed=p.filter(v=>v.q==='CONFIRMED').length;
+  const matched=p.filter(v=>v.q==='LIVE_MATCHED').length;
+  const closed=p.filter(v=>v.q==='US_CLOSED').length;
+  status(p.length?`일별종가 ${p.length}건 · 확정 ${confirmed} · 복구 ${matched} · 미국휴장 ${closed}`:'해당 기간 일별종가 데이터 없음',p.length?true:null);
+ }catch(e){console.error(e);status('일별종가 차트 조회 실패',false)}
+}
+
 function pearson(a,b){if(a.length!==b.length||a.length<2)return null;const ma=a.reduce((s,v)=>s+v,0)/a.length,mb=b.reduce((s,v)=>s+v,0)/b.length;let n=0,da=0,db=0;for(let i=0;i<a.length;i++){const x=a[i]-ma,y=b[i]-mb;n+=x*y;da+=x*x;db+=y*y}const den=Math.sqrt(da*db);return den?n/den:null}
 function strength(r){const a=Math.abs(r);return a>=.8?'매우 강한':a>=.6?'강한':a>=.4?'중간 정도의':a>=.2?'약한':'거의 없는'}
 function direction(r){return r>=0?'양(+)의':'음(-)의'}
@@ -540,7 +502,7 @@ async function loadCorr(){
 }
 
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
-$('refresh').onclick=()=>{update();loadChart();loadCorr()};
+$('refresh').onclick=()=>{update();loadChart(true);loadCorr()};
 $('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)}
 한국 SK하이닉스: ${f0(last.k)}원 (${formatKstBasis(last.krTs)})
 SKHY: $${f2(last.u)} (${formatKstBasis(last.usTs)})
@@ -549,8 +511,6 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 
 update();loadChart();loadCorr();
 setInterval(update,REFRESH);
-setInterval(()=>{
-  if(range==='1h'||range==='1d')loadChart();
-},300000);
+setInterval(()=>loadChart(true),300000);
 setInterval(loadCorr,3600000);
 </script></body></html>
