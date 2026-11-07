@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.8</title>
+<title>닉스환율 지표추적자 v1.04.9</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,11 +25,10 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-.corrgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.corrbox{padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center}.corrv{font-size:18px;font-weight:900;margin-top:3px}
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.8 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.9 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -47,27 +46,10 @@
 <section class="panel"><h2>닉스환율 일별종가 추이</h2>
 <div class="ranges"><button data-r="all">전체</button><button data-r="1mo" class="active">1개월</button><button data-r="1w">1주일</button></div>
 <div class="axis-choice" role="group" aria-label="그래프 Y축 설정"><span>Y축 설정</span><label><input type="radio" name="axisMode" value="integrated"> 통합 Y축</label><label><input type="radio" name="axisMode" value="dual"> 독립 Y축</label></div>
-<div class="ny-choice"><label><input type="checkbox" id="showNyxNewYork"> 닉스환율 뉴욕 표시</label><span id="nyxNewYorkStatus" aria-live="polite"></span></div>
+
 <div class="chart"><canvas id="chart"></canvas></div>
 
-<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:14px">
-<div style="font-weight:800;margin-bottom:8px">Level corr.</div>
-<div class="corrgrid">
-<div class="corrbox"><div class="note" style="margin:0">5D</div><div class="corrv" id="level5">—</div></div>
-<div class="corrbox"><div class="note" style="margin:0">10D</div><div class="corrv" id="level10">—</div></div>
-<div class="corrbox"><div class="note" style="margin:0">20D</div><div class="corrv" id="level20">—</div></div>
-<div class="corrbox"><div class="note" style="margin:0">30D</div><div class="corrv" id="level30">—</div></div>
-</div>
-
-<div style="font-weight:800;margin:14px 0 8px">Return corr.</div>
-<div class="corrgrid">
-<div class="corrbox"><div class="note" style="margin:0">5D</div><div class="corrv" id="return5">—</div></div>
-<div class="corrbox"><div class="note" style="margin:0">10D</div><div class="corrv" id="return10">—</div></div>
-<div class="corrbox"><div class="note" style="margin:0">20D</div><div class="corrv" id="return20">—</div></div>
-<div class="corrbox"><div class="note" style="margin:0">30D</div><div class="corrv" id="return30">—</div></div>
-</div>
-<div id="corrInterpretation" class="note" style="margin-top:11px">해석: 계산 중…</div>
-</div>
+<div class="ny-choice"><label><input type="checkbox" id="showNyxNewYork"> 닉스환율(뉴욕) 표시</label><span id="nyxNewYorkStatus" aria-live="polite"></span></div>
 <div class="note">v1.03: 미국 증시 공식 휴장일에는 SKHY 직전 정규장 종가를 사용해 한국장 15:30 일별값을 이어가며 US_CLOSED로 구분합니다.</div>
 </section>
 </main>
@@ -105,7 +87,6 @@ async function currentRate(){return jget(`${WORKER}/current-rate?t=${Date.now()}
 async function nyxNewYork(){return jget(`${WORKER}/nyx-new-york`,20000)}
 async function dailyClose(days=45){return jget(`${WORKER}/daily-close?days=${days}&t=${Date.now()}`,20000)}
 async function repairDailyClose(date=''){return jget(`${WORKER}/repair-daily-close${date?`?date=${encodeURIComponent(date)}`:''}`,20000)}
-async function syncHistory(range){return jget(`${WORKER}/sync-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
 async function wsPrice(){try{return await jget(WORKER,17000)}catch{return null}}
 
 function points(o){return (o?.points||[]).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v))}
@@ -153,21 +134,6 @@ function alignIntraday(K,U,X){
 }
 
 
-function syncPoints(rows){
- return (rows||[])
-  .map(r=>({
-    t:Number(r.timestamp),
-    n:Number(r.nyx_rate),
-    x:Number(r.usdkrw)
-  }))
-  .filter(p=>
-    Number.isFinite(p.t)&&
-    Number.isFinite(p.n)&&
-    Number.isFinite(p.x)&&
-    p.n>0&&p.x>0
-  )
-  .sort((a,b)=>a.t-b.t);
-}
 
 function kstTodayStartMs(){
  const now=new Date();
@@ -445,7 +411,7 @@ function render(p){
     datasets:[
      {label:'닉스환율',data:nyxData,borderColor:'#6aa7ff',backgroundColor:'#6aa7ff',yAxisID:'y',borderWidth:2,pointRadius:0,tension:.15},
      {label:'USD/KRW',data:fxData,borderColor:'#f4a261',backgroundColor:'#f4a261',yAxisID:axisMode==='dual'?'yFx':'y',borderWidth:1.5,pointRadius:0,tension:.15},
-     {label:'닉스환율 뉴욕',data:p.map(q=>q.ny??null),borderColor:'#b38bff',backgroundColor:'#b38bff',yAxisID:'y',borderWidth:2,pointRadius:3,pointHoverRadius:5,tension:0,spanGaps:false,hidden:!showNyxNewYork}
+     {label:'닉스환율(뉴욕)',data:p.map(q=>q.ny??null),borderColor:'#b38bff',backgroundColor:'#b38bff',yAxisID:'y',borderWidth:2,pointRadius:0,pointHoverRadius:0,tension:0,spanGaps:false,hidden:!showNyxNewYork}
     ]
    },
    options:{
@@ -537,72 +503,18 @@ async function loadChart(force=false){
  }catch(e){console.error(e);status('일별종가 차트 조회 실패',false)}
 }
 
-function pearson(a,b){if(a.length!==b.length||a.length<2)return null;const ma=a.reduce((s,v)=>s+v,0)/a.length,mb=b.reduce((s,v)=>s+v,0)/b.length;let n=0,da=0,db=0;for(let i=0;i<a.length;i++){const x=a[i]-ma,y=b[i]-mb;n+=x*y;da+=x*x;db+=y*y}const den=Math.sqrt(da*db);return den?n/den:null}
-function strength(r){const a=Math.abs(r);return a>=.8?'매우 강한':a>=.6?'강한':a>=.4?'중간 정도의':a>=.2?'약한':'거의 없는'}
-function direction(r){return r>=0?'양(+)의':'음(-)의'}
-async function loadCorr(){
- try{
-  const h=await syncHistory('30d');
-  if(!h.ok)throw Error(h.error||'sync corr');
-
-  const d=syncPoints(h.points);
-  const levels={},rets={};
-  const now=d.at(-1)?.t||Date.now();
-
-  for(const n of [5,10,20,30]){
-   const cut=now-n*86400000;
-   const s=d.filter(v=>v.t>=cut);
-
-   levels[n]=s.length>=12
-    ? pearson(s.map(v=>v.n),s.map(v=>v.x))
-    : null;
-
-   if(s.length>=13){
-    const a=[],b=[];
-    for(let i=1;i<s.length;i++){
-     if(s[i-1].n>0&&s[i-1].x>0){
-      a.push(s[i].n/s[i-1].n-1);
-      b.push(s[i].x/s[i-1].x-1);
-     }
-    }
-    rets[n]=a.length>=12?pearson(a,b):null;
-   }else rets[n]=null;
-
-   $('level'+n).textContent=
-    levels[n]==null?'—':`${levels[n]>=0?'+':''}${levels[n].toFixed(2)}`;
-
-   $('return'+n).textContent=
-    rets[n]==null?'—':`${rets[n]>=0?'+':''}${rets[n].toFixed(2)}`;
-  }
-
-  const l=levels[20]??levels[10]??levels[5];
-  const r=rets[20]??rets[10]??rets[5];
-
-  $('corrInterpretation').textContent=
-   (l==null&&r==null)
-    ? '해석: 동일시각 데이터가 아직 충분히 누적되지 않았습니다.'
-    : (l!=null&&r!=null)
-      ? `해석: Level은 ${strength(l)} ${direction(l)} 상관, Return은 ${strength(r)} ${direction(r)} 상관입니다.`
-      : `해석: 현재 계산 가능한 지표에서 ${strength(l??r)} ${direction(l??r)} 상관이 관찰됩니다.`;
-
- }catch(e){
-  console.error(e);
-  $('corrInterpretation').textContent='해석: 동일시각 Corr 데이터 조회 실패';
- }
-}
 
 $('showNyxNewYork').addEventListener('change',e=>{showNyxNewYork=!!e.target.checked;loadChart()});
 document.querySelectorAll('[name=axisMode]').forEach(r=>{r.checked=r.value===axisMode;r.addEventListener('change',()=>{if(!r.checked)return;axisMode=r.value;try{localStorage.setItem('nyx-axis-mode',axisMode)}catch{}applyAxisMode()})});
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
-$('refresh').onclick=()=>{update();loadChart(true);loadCorr()};
+$('refresh').onclick=()=>{update();loadChart(true)};
 $('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)}
 한국 SK하이닉스: ${f0(last.k)}원 (${formatKstBasis(last.krTs)})
 SKHY: $${f2(last.u)} (${formatKstBasis(last.usTs)})
 USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
-update();loadChart();loadCorr();
+update();loadChart();
 setInterval(update,REFRESH);
 setInterval(()=>loadChart(),300000);
-setInterval(loadCorr,3600000);
 </script></body></html>
