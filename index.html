@@ -411,7 +411,7 @@ function render(p){
     datasets:[
      {label:'닉스환율',data:nyxData,borderColor:'#6aa7ff',backgroundColor:'#6aa7ff',yAxisID:'y',borderWidth:2,pointRadius:0,tension:.15},
      {label:'USD/KRW',data:fxData,borderColor:'#f4a261',backgroundColor:'#f4a261',yAxisID:axisMode==='dual'?'yFx':'y',borderWidth:1.5,pointRadius:0,tension:.15},
-     {label:'닉스환율(뉴욕)',data:p.map(q=>q.ny??null),borderColor:'#b38bff',backgroundColor:'#b38bff',yAxisID:'y',borderWidth:2,pointRadius:0,pointHoverRadius:0,tension:0,spanGaps:false,hidden:!showNyxNewYork}
+     {label:'닉스환율(뉴욕)',data:p.map(q=>q.ny??null),borderColor:'#b38bff',backgroundColor:'#b38bff',yAxisID:'y',borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHitRadius:12,tension:.15,spanGaps:false,hidden:!showNyxNewYork}
     ]
    },
    options:{
