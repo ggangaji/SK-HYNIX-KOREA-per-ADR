@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.6</title>
+<title>닉스환율 지표추적자 v1.04.8</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -22,12 +22,14 @@
 .chart{height:310px;margin-top:8px}.note{color:var(--muted);font-size:11px;line-height:1.5;margin-top:8px}
  .axis-choice{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:var(--muted)}
 .axis-choice label{display:inline-flex;align-items:center;gap:5px;cursor:pointer}.axis-choice input{accent-color:var(--accent)}
+.ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
+.ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
 .corrgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.corrbox{padding:9px 3px;border:1px solid var(--line);border-radius:12px;text-align:center}.corrv{font-size:18px;font-weight:900;margin-top:3px}
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.6 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.8 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -45,6 +47,7 @@
 <section class="panel"><h2>닉스환율 일별종가 추이</h2>
 <div class="ranges"><button data-r="all">전체</button><button data-r="1mo" class="active">1개월</button><button data-r="1w">1주일</button></div>
 <div class="axis-choice" role="group" aria-label="그래프 Y축 설정"><span>Y축 설정</span><label><input type="radio" name="axisMode" value="integrated"> 통합 Y축</label><label><input type="radio" name="axisMode" value="dual"> 독립 Y축</label></div>
+<div class="ny-choice"><label><input type="checkbox" id="showNyxNewYork"> 닉스환율 뉴욕 표시</label><span id="nyxNewYorkStatus" aria-live="polite"></span></div>
 <div class="chart"><canvas id="chart"></canvas></div>
 
 <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:14px">
@@ -73,6 +76,7 @@
 const WORKER='https://nyx-rate-proxy.duienugu.workers.dev', REFRESH=15000, $=id=>document.getElementById(id);
 let range='1mo', chart=null, last=null;
 let axisMode='dual';
+let showNyxNewYork=false, nyxNewYorkCache=null, nyxNewYorkCacheAt=0;
 try{axisMode=localStorage.getItem('nyx-axis-mode')==='integrated'?'integrated':'dual'}catch{}
 let closeBaselineCache=null, closeBaselineAt=0;
 let historyCache=null, historyCacheAt=0;
@@ -98,6 +102,7 @@ async function historyData(preset){return jget(`${WORKER}/history?preset=${prese
 async function dbHistory(range){return jget(`${WORKER}/db-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
 async function latestSync(){return jget(`${WORKER}/latest-sync?t=${Date.now()}`,20000)}
 async function currentRate(){return jget(`${WORKER}/current-rate?t=${Date.now()}`,20000)}
+async function nyxNewYork(){return jget(`${WORKER}/nyx-new-york`,20000)}
 async function dailyClose(days=45){return jget(`${WORKER}/daily-close?days=${days}&t=${Date.now()}`,20000)}
 async function repairDailyClose(date=''){return jget(`${WORKER}/repair-daily-close${date?`?date=${encodeURIComponent(date)}`:''}`,20000)}
 async function syncHistory(range){return jget(`${WORKER}/sync-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
@@ -418,6 +423,7 @@ function applyAxisMode(){
  const dual=axisMode==='dual';
  chart.data.datasets[0].yAxisID='y';
  chart.data.datasets[1].yAxisID=dual?'yFx':'y';
+ if(chart.data.datasets[2])chart.data.datasets[2].yAxisID='y';
  chart.options.scales.y.ticks.color=dual?'#6aa7ff':'#95a1b2';
  if(dual){
   chart.options.scales.yFx={type:'linear',position:'right',display:true,grid:{drawOnChartArea:false},ticks:{color:'#f4a261'}};
@@ -438,7 +444,8 @@ function render(p){
     labels,
     datasets:[
      {label:'닉스환율',data:nyxData,borderColor:'#6aa7ff',backgroundColor:'#6aa7ff',yAxisID:'y',borderWidth:2,pointRadius:0,tension:.15},
-     {label:'USD/KRW',data:fxData,borderColor:'#f4a261',backgroundColor:'#f4a261',yAxisID:axisMode==='dual'?'yFx':'y',borderWidth:1.5,pointRadius:0,tension:.15}
+     {label:'USD/KRW',data:fxData,borderColor:'#f4a261',backgroundColor:'#f4a261',yAxisID:axisMode==='dual'?'yFx':'y',borderWidth:1.5,pointRadius:0,tension:.15},
+     {label:'닉스환율 뉴욕',data:p.map(q=>q.ny??null),borderColor:'#b38bff',backgroundColor:'#b38bff',yAxisID:'y',borderWidth:2,pointRadius:3,pointHoverRadius:5,tension:0,spanGaps:false,hidden:!showNyxNewYork}
     ]
    },
    options:{
@@ -466,6 +473,8 @@ function render(p){
  chart.data.labels=labels;
  chart.data.datasets[0].data=nyxData;
  chart.data.datasets[1].data=fxData;
+ chart.data.datasets[2].data=p.map(q=>q.ny??null);
+ chart.data.datasets[2].hidden=!showNyxNewYork;
  applyAxisMode();
 }
 let dailyPointsCache=null, dailyPointsCacheAt=0;
@@ -479,12 +488,47 @@ async function loadDailyPoints(force=false){
   })).filter(q=>Number.isFinite(q.t)&&q.n>0&&q.x>0).sort((a,b)=>a.t-b.t);
   dailyPointsCache=p;dailyPointsCacheAt=Date.now();closeBaselineCache=p;closeBaselineAt=Date.now();return p;
 }
+async function loadNyxNewYorkPoints(force=false){
+ const now=Date.now();
+ // Yahoo history is fetched only if the user explicitly enables this series.
+ // Cache locally for 30 minutes; Worker endpoint independently caches upstream Yahoo.
+ if(!force && nyxNewYorkCache && now-nyxNewYorkCacheAt<1800000)return nyxNewYorkCache;
+ const response=await nyxNewYork();
+ if(!response?.ok)throw Error(response?.error||'New York daily close unavailable');
+ nyxNewYorkCache=(response.points||[]).map(r=>({
+  date:String(r.date),t:Number(r.timestamp),ny:Number(r.nyx_rate)
+ })).filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&Number.isFinite(r.t)&&r.ny>0);
+ nyxNewYorkCacheAt=now;
+ return nyxNewYorkCache;
+}
+function mergeNewYorkPoints(main,ny){
+ const byDate=new Map(main.map(r=>[r.date,{...r}]));
+ for(const q of ny){
+  const prior=byDate.get(q.date);
+  if(prior){prior.ny=q.ny;}
+  else byDate.set(q.date,{date:q.date,t:q.t,n:null,x:null,ny:q.ny,q:'NY_ONLY'});
+ }
+ return [...byDate.values()].sort((a,b)=>a.t-b.t);
+}
 async function loadChart(force=false){
  try{
   const all=await loadDailyPoints(force);
+  let composed=all;
+  const statusEl=$('nyxNewYorkStatus');
+  if(showNyxNewYork){
+   try{
+    const ny=await loadNyxNewYorkPoints(force);
+    composed=mergeNewYorkPoints(all,ny);
+    statusEl.textContent=ny.length?` · ${ny.length}거래일`:' · 데이터 없음';
+   }catch(e){
+    console.warn('NYX New York close unavailable',e);
+    statusEl.textContent=' · 뉴욕 데이터 조회 실패';
+    // Keep the original chart usable even if Yahoo fails.
+   }
+  }else statusEl.textContent='';
   const now=Date.now();
   const cutoff=range==='1w'?now-7*86400000:range==='1mo'?now-30*86400000:0;
-  const p=all.filter(q=>q.t>=cutoff);
+  const p=composed.filter(q=>q.t>=cutoff);
   render(p);
   const confirmed=p.filter(v=>v.q==='CONFIRMED').length;
   const matched=p.filter(v=>v.q==='LIVE_MATCHED').length;
@@ -547,6 +591,7 @@ async function loadCorr(){
  }
 }
 
+$('showNyxNewYork').addEventListener('change',e=>{showNyxNewYork=!!e.target.checked;loadChart()});
 document.querySelectorAll('[name=axisMode]').forEach(r=>{r.checked=r.value===axisMode;r.addEventListener('change',()=>{if(!r.checked)return;axisMode=r.value;try{localStorage.setItem('nyx-axis-mode',axisMode)}catch{}applyAxisMode()})});
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
 $('refresh').onclick=()=>{update();loadChart(true);loadCorr()};
@@ -558,6 +603,6 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 
 update();loadChart();loadCorr();
 setInterval(update,REFRESH);
-setInterval(()=>loadChart(true),300000);
+setInterval(()=>loadChart(),300000);
 setInterval(loadCorr,3600000);
 </script></body></html>
