@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.10</title>
+<title>닉스환율 지표추적자 v1.04.11</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -28,7 +28,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.10 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.11 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -51,6 +51,17 @@
 
 <div class="ny-choice"><label><input type="checkbox" id="showNyxNewYork"> 닉스환율(뉴욕) 표시</label><span id="nyxNewYorkStatus" aria-live="polite"></span></div>
 <div class="note">미국 증시 공식 휴장일에는 SKHY 직전 정규장 종가를 사용해 한국장 15:30 일별값을 이어가며 US_CLOSED로 구분합니다.</div>
+</section>
+
+<section class="panel" id="nyxAiPanel" aria-label="닉스환율 AI 분석가">
+  <h2>닉스환율 AI 분석가 <span style="font-size:11px;color:var(--muted);font-weight:500">K-EXAONE 2.5</span></h2>
+  <p class="note">현재 화면에 확보된 시세와 최근 일별 종가를 해석합니다. 버튼을 누를 때만 분석하며, D1 추가 조회는 하지 않습니다.</p>
+  <label for="nyxAiQuestion" class="label">분석 질문 (선택)</label>
+  <textarea id="nyxAiQuestion" maxlength="400" rows="2" placeholder="예: 최근 닉스환율 상승은 한국 주가 때문일까, ADR 때문일까?" style="margin-top:6px;width:100%;resize:vertical;background:#10151c;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px"></textarea>
+  <div class="actions"><button class="primary" id="nyxAiAnalyze">EXAONE으로 분석</button><button id="nyxAiClear">분석 내용 지우기</button></div>
+  <div id="nyxAiState" class="note" role="status" aria-live="polite"></div>
+  <div id="nyxAiOutput" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.75;margin-top:10px" aria-live="polite"></div>
+  <div class="note">AI는 실시간 뉴스나 선물 수급을 자동 조회하지 않습니다. 분석 결과는 제공된 데이터의 해석이며 예측의 확정값이 아닙니다.</div>
 </section>
 </main>
 
@@ -513,6 +524,40 @@ $('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)
 SKHY: $${f2(last.u)} (${formatKstBasis(last.usTs)})
 USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
+
+
+// v1.04.11 EXAONE AI: explicit user request, use existing in-memory snapshots only.
+let nyxAiBusy=false;
+$('nyxAiAnalyze').addEventListener('click',async()=>{
+ if(nyxAiBusy)return;
+ let pass='';
+ try{pass=sessionStorage.getItem('nyx-ai-access')||''}catch{}
+ if(!pass){pass=prompt('닉스환율 AI 분석 접근 암호를 입력하세요 (Cloudflare NYX_AI_ACCESS_TOKEN)')||'';if(!pass)return;}
+ const current=last?{nyx:last.n,kr:last.k,skhy:last.u,usdkrw:last.x,basis:last.mode}:{};
+ const days=(Array.isArray(dailyPointsCache)?dailyPointsCache:[]).slice(-35).map(p=>({
+  date:p.date,nyx:p.n,usdkrw:p.x,
+  nyxNewYork:nyxNewYorkCache?.find(q=>q.date===p.date)?.ny??null
+ }));
+ const button=$('nyxAiAnalyze');nyxAiBusy=true;button.disabled=true;
+ $('nyxAiState').textContent='EXAONE 분석 요청 중…';
+ try{
+  const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),70000);
+  let res;
+  try{res=await fetch(WORKER+'/ai-analyze',{
+   method:'POST',headers:{'Content-Type':'application/json','X-NYX-AI-Access':pass},
+   body:JSON.stringify({current,daily:days,question:$('nyxAiQuestion').value}),signal:ctl.signal,cache:'no-store'
+  });}finally{clearTimeout(timer)}
+  const data=await res.json();
+  if(!res.ok||!data.ok)throw Error(data.error||`HTTP ${res.status}`);
+  $('nyxAiOutput').textContent=data.answer;
+  $('nyxAiState').textContent=`분석 완료 · ${new Date().toLocaleString('ko-KR')} · ${days.length}개 일별 기록 제공`;
+  try{sessionStorage.setItem('nyx-ai-access',pass)}catch{}
+ }catch(e){
+  $('nyxAiState').textContent='분석 실패: '+(e.name==='AbortError'?'요청 시간 초과':e.message);
+  if(/접근 암호/.test(e.message)){try{sessionStorage.removeItem('nyx-ai-access')}catch{}}
+ }finally{nyxAiBusy=false;button.disabled=false;}
+});
+$('nyxAiClear').addEventListener('click',()=>{$('nyxAiOutput').textContent='';$('nyxAiState').textContent='';});
 
 update();loadChart();
 setInterval(update,REFRESH);
