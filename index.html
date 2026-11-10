@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.22</title>
+<title>닉스환율 지표추적자 v1.04.23</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,7 +25,7 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-/* v1.04.22: compact comparison dashboard + period controls */
+/* v1.04.23: compact comparison dashboard + period controls */
 .ai-period{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 12px}
 .ai-period label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text)}
 .ai-period input{accent-color:var(--accent)}
@@ -76,7 +76,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.22 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.23 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -517,6 +517,7 @@ async function loadDailyPoints(force=false){
   if(!h.ok)throw Error(h.error||'daily close');
   const p=(h.points||[]).map(r=>({
     t:Number(r.timestamp),n:Number(r.nyx_rate),x:Number(r.usdkrw),
+    kr:Number(r.kr_price),sk:Number(r.skhy_price),krTs:Number(r.kr_timestamp),skTs:Number(r.skhy_timestamp),fxTs:Number(r.fx_timestamp),
     q:r.quality||'REFERENCE',date:r.date||key(Number(r.timestamp))
   })).filter(q=>Number.isFinite(q.t)&&q.n>0&&q.x>0).sort((a,b)=>a.t-b.t);
   dailyPointsCache=p;dailyPointsCacheAt=Date.now();closeBaselineCache=p;closeBaselineAt=Date.now();return p;
@@ -582,7 +583,7 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 
-// v1.04.22: Browser-side pattern diagnostics; AI only interprets verified features.
+// v1.04.23: Browser-side pattern diagnostics; AI only interprets verified features.
 let nyxAiBusy=false, aiPeriod='today';
 const aiResultCache=new Map();
 const aiPercent=n=>Number.isFinite(n)?`${n>0?'+':''}${n.toFixed(2)}%`:'—';
@@ -648,7 +649,7 @@ function aiPatternDiagnostics(commonRows){
   // Direction of NYK premium relative to the Korea-close observation, not a USD/KRW FX rate.
   mostRecentNewYorkBelowSeoul:latestSpreadPct<0};
 }
-// v1.04.22 - full five-indicator daily analysis using cached Seoul/New York observations.
+// v1.04.23 - full five-indicator daily analysis using cached Seoul/New York observations.
 // Values are transported as a bounded daily series, not interpreted as causal proof.
 function aiDailyEvidence(seoulRows,nyRows,period){
  const nyMap=new Map(nyRows.filter(r=>aiIsDate(r.date)&&r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
@@ -809,6 +810,62 @@ function aiPrepareComparison(seoulRows,nyRows,period){
   newyork:nyRows.filter(r=>r.date>=newyork.start&&r.date<=newyork.end)
  }};
 }
+// v1.04.23: Today's analysis must use the confirmed 15:30 KST D1 row, never the prior US close.
+function aiPrepareToday(rows){
+ const valid=rows.filter(r=>aiIsDate(r.date)&&r.n>0&&r.x>0&&r.kr>0&&r.sk>0)
+  .sort((a,b)=>a.date.localeCompare(b.date));
+ if(!valid.length)throw Error('한국장 15:30 확정 기록에 4개 기본 가격이 없습니다. /daily-close 저장 여부를 확인하세요.');
+ const today=valid.at(-1),prev=valid.at(-2)||null;
+ const latestRecord=rows.filter(r=>aiIsDate(r.date)).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
+ if(latestRecord?.date!==today.date)throw Error('가장 최근 한국장 기록의 SKHY 또는 한국 종가가 없어 당일 분석을 진행할 수 없습니다.');
+ const identity=.1*today.kr/today.sk;
+ if(Math.abs(identity-today.n)>Math.max(.25,today.n*.001))throw Error('해당 날짜의 SKHY 가격과 닉스환율 산식이 일치하지 않습니다.');
+ const day={date:today.date,nyx:today.n,fx:today.x,kr:today.kr,skhyAtKoreaClose:today.sk,
+  source:'D1 한국장 15:30 확정 기록',
+  quoteTimestamps:{kr:today.krTs||null,skhy:today.skTs||null,fx:today.fxTs||null}};
+ const baseline=prev?{date:prev.date,nyx:prev.n,fx:prev.x,kr:prev.kr,skhyAtKoreaClose:prev.sk}:null;
+ const change=baseline?{nyx:aiPct(baseline.nyx,day.nyx),fx:aiPct(baseline.fx,day.fx),
+  kr:aiPct(baseline.kr,day.kr),skhyAtKoreaClose:aiPct(baseline.skhyAtKoreaClose,day.skhyAtKoreaClose)}:null;
+ return {period:'today',date:today.date,day,baseline,change};
+}
+function aiRenderToday(t){
+ const el=$('nyxAiMetrics');el.replaceChildren();el.style.display='block';
+ const heading=document.createElement('div');heading.className='ai-metric-heading';heading.textContent=`당일 · ${t.date} 한국장 15:30 기준`;
+ const grid=document.createElement('div');grid.className='ai-grid';
+ const add=(label,value,delta,note,wide=false)=>{
+  const item=document.createElement('div');item.className='ai-metric'+(wide?' fx-alone':'');
+  const figures=document.createElement('div');figures.className='ai-figures';
+  const small=document.createElement('small');small.textContent=label;
+  const strong=document.createElement('strong');strong.textContent=value;strong.style.color='var(--text)';
+  const sub=document.createElement('div');sub.className='ai-sub';sub.textContent=note+(Number.isFinite(delta)?` · 전 거래일 ${aiPercent(delta)}`:'');
+  figures.append(small,strong,sub);item.append(figures);grid.append(item);
+ };
+ add('닉스환율',t.day.nyx.toFixed(3),t.change?.nyx,'한국장 15:30');
+ add('원/달러 환율',t.day.fx.toFixed(2),t.change?.fx,'한국장 15:30');
+ add('한국 SK하이닉스',Math.round(t.day.kr).toLocaleString('ko-KR')+'원',t.change?.kr,'한국 정규장 종가');
+ add('미국 SKHY ADR','$'+t.day.skhyAtKoreaClose.toFixed(3),t.change?.skhyAtKoreaClose,'한국장 15:30 시점',true);
+ const meta=document.createElement('div');meta.className='ai-meta';meta.textContent=t.baseline?
+  `등락률 기준: 직전 한국 거래일 ${t.baseline.date} → ${t.date}. 오늘의 시점별 가격은 D1 한국장 확정 기록 사용.`:
+  '전 거래일 확정 기록이 없어 당일 가격만 표시합니다.';
+ el.append(heading,grid,meta);
+ const panel=document.createElement('section');panel.className='ai-pattern';
+ const title=document.createElement('div');title.className='ai-pattern-title';title.textContent='닉스환율 지표추적자 분석 · 당일';panel.append(title);
+ const cards=document.createElement('div');cards.className='ai-pattern-grid';
+ const card=(label,value,explanation)=>{const item=document.createElement('div');item.className='ai-pattern-item';
+  for(const [cls,txt] of [['ai-pattern-label',label],['ai-pattern-value',value],['ai-pattern-desc',explanation]]){
+   const e=document.createElement('div');e.className=cls;e.textContent=txt;item.append(e)}cards.append(item)};
+ if(t.change){
+  const c=t.change,delta=c.nyx-c.fx;
+  card('닉스환율 · 원/달러',Math.sign(c.nyx)===Math.sign(c.fx)?'같은 방향':'반대 방향',
+   `닉스환율 ${aiPercent(c.nyx)} · 원/달러 ${aiPercent(c.fx)} · 등락률 차이 ${Math.abs(delta).toFixed(2)}%p`);
+  card('한국주가 · 한국장 15:30 SKHY',`한국 ${aiPercent(c.kr)} · SKHY ${aiPercent(c.skhyAtKoreaClose)}`,
+   '직전 한국 거래일 동일 기준시점 대비 변화');
+ }
+ card('당일 닉스환율 계산',t.day.nyx.toFixed(3),
+  `한국 주가 ${Math.round(t.day.kr).toLocaleString('ko-KR')}원 · SKHY $${t.day.skhyAtKoreaClose.toFixed(3)} · 원/달러 ${t.day.fx.toFixed(2)}`);
+ card('닉스환율(뉴욕)','미확정','해당 미국 정규장 종가가 확정된 뒤에만 비교합니다.');
+ panel.append(cards);el.append(panel);
+}
 function aiLocalInsight(m){
  const p=m.patterns;
  if(!p)return '두 닉스환율의 동일 거래일 기록이 부족해 격차 원인을 분석할 수 없습니다.';
@@ -841,14 +898,20 @@ async function aiRun(force=false){
  $('nyxAiState').textContent=`${aiPeriodNames[period]} · 패턴 분석 중…`;
  try{
   if(!dailyPointsCache?.length)throw Error('일별종가 데이터 로딩이 완료되지 않았습니다.');
-  const nyRows=await loadNyxNewYorkPoints(); // Yahoo only; no additional D1 query.
-  const m=aiPrepareComparison(dailyPointsCache,nyRows,period);
-  aiRenderMetrics(m);$('nyxAiOutput').replaceChildren();
-  // Exclude chart-only series so that cache keys and payload stay small.
-  const {display,dailyFindings,...baseSummary}=m;
-  // Compact full daily series + calculated exceptions; excludes large nested diagnostic rows.
-  const {dailyEvidence,...summaryBase}=baseSummary;
-  const summary={...summaryBase,dailyEvidence,dailyFindings:{...dailyFindings,dayRows:undefined}};
+  let summary, m=null;
+  if(period==='today'){
+   // No Yahoo New York request; only the four prices already stored together in the D1 15:30 record.
+   const t=aiPrepareToday(dailyPointsCache);
+   aiRenderToday(t);$('nyxAiOutput').replaceChildren();
+   summary=t;
+  }else{
+   const nyRows=await loadNyxNewYorkPoints();
+   m=aiPrepareComparison(dailyPointsCache,nyRows,period);
+   aiRenderMetrics(m);$('nyxAiOutput').replaceChildren();
+   const {display,dailyFindings,...baseSummary}=m;
+   const {dailyEvidence,...summaryBase}=baseSummary;
+   summary={...summaryBase,dailyEvidence,dailyFindings:{...dailyFindings,dayRows:undefined}};
+  }
   const cacheKey=JSON.stringify(summary);
   if(!force && aiResultCache.has(cacheKey)){
    aiShowResult(m,aiResultCache.get(cacheKey),'ai');
