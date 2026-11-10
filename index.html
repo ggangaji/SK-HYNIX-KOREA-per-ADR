@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.17</title>
+<title>닉스환율 지표추적자 v1.04.18</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,7 +25,7 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-/* v1.04.17: compact comparison dashboard + period controls */
+/* v1.04.18: compact comparison dashboard + period controls */
 .ai-period{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 12px}
 .ai-period label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text)}
 .ai-period input{accent-color:var(--accent)}
@@ -68,7 +68,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.17 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.18 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -570,7 +570,7 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 
-// v1.04.17: Browser-side pattern diagnostics; AI only interprets verified features.
+// v1.04.18: Browser-side pattern diagnostics; AI only interprets verified features.
 let nyxAiBusy=false, aiPeriod='today';
 const aiResultCache=new Map();
 const aiPercent=n=>Number.isFinite(n)?`${n>0?'+':''}${n.toFixed(2)}%`:'—';
@@ -636,6 +636,50 @@ function aiPatternDiagnostics(commonRows){
   // Direction of NYK premium relative to the Korea-close observation, not a USD/KRW FX rate.
   mostRecentNewYorkBelowSeoul:latestSpreadPct<0};
 }
+// v1.04.18 - full five-indicator daily analysis using cached Seoul/New York observations.
+// Values are transported as a bounded daily series, not interpreted as causal proof.
+function aiDailyEvidence(seoulRows,nyRows,period){
+ const nyMap=new Map(nyRows.filter(r=>aiIsDate(r.date)&&r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
+ const seoul=seoulRows.filter(r=>aiIsDate(r.date)&&r.n>0&&r.x>0).sort((a,b)=>a.date.localeCompare(b.date));
+ const mostRecent=seoul.at(-1)?.date;
+ if(!mostRecent)return [];
+ const earliest=Date.parse(mostRecent+'T00:00:00+09:00')-(period==='1mo'?35:period==='1w'?14:8)*86400000;
+ const candidates=seoul.filter(r=>Date.parse(r.date+'T00:00:00+09:00')>=earliest);
+ const rows=candidates.map(r=>{
+  const us=nyMap.get(r.date),kr=us?.kr||null;
+  // Seoul close numerator and daily KR price are from independent feeds; guard mismatched closes.
+  const adrAtSeoul=kr>0&&r.n>0&&Number.isFinite(r.n) ? .1*kr/r.n:null;
+  return {d:r.date,s:Number(r.n.toFixed(3)),f:Number(r.x.toFixed(3)),
+   k:kr>0?Number(kr.toFixed(2)):null,u:us?.us>0?Number(us.us.toFixed(3)):null,
+   y:us?.ny>0?Number(us.ny.toFixed(3)):null,
+   a:adrAtSeoul>0?Number(adrAtSeoul.toFixed(3)):null};
+ });
+ // Date is explicit: a US close after the Korea market close belongs to that same local date.
+ return rows.slice(period==='today'?-4:period==='1w'?-12:-35);
+}
+function aiDailyFindings(rows){
+ const ordered=[...rows].sort((a,b)=>a.d.localeCompare(b.d));
+ const changes=[];
+ for(let i=1;i<ordered.length;i++){
+  const p=ordered[i-1],r=ordered[i],ret={d:r.d};
+  for(const key of ['s','y','k','u','f'])ret[key]=aiPct(p[key],r[key]);
+  ret.gap=(ret.s!==null&&ret.y!==null)?ret.y-ret.s:null;
+  ret.usFromSeoul=(r.a>0&&r.u>0)?aiPct(r.a,r.u):null;
+  changes.push(ret);
+ }
+ const pair=changes.filter(r=>Number.isFinite(r.gap));
+ const biggest=[...pair].sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap))[0]||null;
+ const withKRUS=changes.filter(r=>Number.isFinite(r.k)&&Number.isFinite(r.u));
+ const biggestStock=[...withKRUS].sort((a,b)=>Math.abs(b.k-b.u)-Math.abs(a.k-a.u))[0]||null;
+ const fxComparisons=changes.filter(r=>Number.isFinite(r.s)&&Number.isFinite(r.f));
+ const fxSame=fxComparisons.filter(r=>Math.sign(r.s)===Math.sign(r.f)).length;
+ // Treat short samples as descriptive only. No significance or prediction claims.
+ return {n:ordered.length,changeCount:changes.length,
+  largestGap:biggest?{date:biggest.d,spreadPp:biggest.gap,kr:biggest.k,us:biggest.u,fx:biggest.f,adrAfter:biggest.usFromSeoul}:null,
+  largestStockDifference:biggestStock?{date:biggestStock.d,kr:biggestStock.k,us:biggestStock.u,differencePp:biggestStock.k-biggestStock.u}:null,
+  fxDirection:{same:fxSame,total:fxComparisons.length},
+  dayRows:changes};
+}
 function aiRenderMetrics(m){
  const el=$('nyxAiMetrics');el.replaceChildren();el.style.display='block';
  const heading=document.createElement('div');heading.className='ai-metric-heading';heading.textContent=`${aiPeriodNames[m.period]} · 주요 5개 지표 변동`;
@@ -695,6 +739,20 @@ function aiRenderMetrics(m){
    const ratio=p.volatilitySeoul>0?(p.volatilityNewYork/p.volatilitySeoul).toFixed(1):null;
    addItem('일별 변화율의 표준편차',`한국 ${p.volatilitySeoul.toFixed(2)}% · 뉴욕 ${p.volatilityNewYork.toFixed(2)}%`,ratio?`해당 기간 뉴욕 지표의 일별 변동성이 한국장 기준의 약 ${ratio}배였습니다. 표본이 적으면 장기적 특성으로 볼 수 없습니다.`:'표본 수와 데이터 품질을 함께 확인해야 합니다.');
   }
+  if(m.dailyFindings){
+   const d=m.dailyFindings;
+   const fp=n=>Number.isFinite(n)?aiPercent(n):'자료 부족';
+   if(d.largestStockDifference){const t=d.largestStockDifference;
+    addItem('한국·미국 개별주가 차이가 가장 컸던 날',t.date,
+      `한국 주가 ${fp(t.kr)} · 미국 ADR ${fp(t.us)} (일별 등락률 차이 ${Math.abs(t.differencePp).toFixed(2)}%p). 동일 거래일 각각의 종가 기준입니다.`);
+   }
+   if(d.largestGap){const t=d.largestGap;
+    addItem('두 닉스환율 최대 분기일의 주가',t.date,
+      `한국 주가 ${fp(t.kr)}, 미국 ADR ${fp(t.us)}, 원/달러 ${fp(t.fx)}. 미국 ADR의 한국장 마감 후 변화 추정 ${fp(t.adrAfter)}. 개별 원본시각을 검증해야 합니다.`);
+   }
+   if(d.fxDirection.total){addItem('닉스환율·원/달러 방향 비교',`${d.fxDirection.total}번 중 ${d.fxDirection.same}번 동행`,
+     `전 거래일 대비 상승·하락 방향 비교. 방향의 일치는 인과관계나 실제 환전 기회를 의미하지 않습니다.`);}
+  }
   box.append(strong,periodText,grid);el.append(box);
  }else{const note=document.createElement('div');note.className='ai-meta';note.textContent='공통 거래일이 2건 미만이어서 두 지표의 분기점은 판단하지 않습니다.';el.append(note)}
 }
@@ -710,10 +768,12 @@ function aiPrepareComparison(seoulRows,nyRows,period){
  const patternCutoff=lastMatch?Date.parse(lastMatch.date+'T00:00:00+09:00')-(period==='1mo'?30:7)*86400000:0;
  const patternRows=allMatches.filter(r=>Date.parse(r.date+'T00:00:00+09:00')>=patternCutoff);
  const pattern=aiPatternDiagnostics(patternRows);
+ const dailyEvidence=aiDailyEvidence(seoulRows,nyRows,period);
+ const dailyFindings=aiDailyFindings(dailyEvidence);
  const both=common.length>=2?{start:common[0].date,end:common.at(-1).date,count:common.length,
   seoulFirst:common[0].n,seoulLast:common.at(-1).n,seoulChange:aiPct(common[0].n,common.at(-1).n),
   newyorkFirst:common[0].ny,newyorkLast:common.at(-1).ny,newyorkChange:aiPct(common[0].ny,common.at(-1).ny)}:null;
- return {period,seoul,newyork,overlap:both,patterns:pattern,display:{
+ return {period,seoul,newyork,overlap:both,patterns:pattern,dailyEvidence,dailyFindings,display:{
   seoul:seoulRows.filter(r=>r.date>=seoul.start&&r.date<=seoul.end),
   newyork:nyRows.filter(r=>r.date>=newyork.start&&r.date<=newyork.end)
  }};
@@ -745,7 +805,10 @@ async function aiRun(force=false){
   const m=aiPrepareComparison(dailyPointsCache,nyRows,period);
   aiRenderMetrics(m);$('nyxAiOutput').replaceChildren();
   // Exclude chart-only series so that cache keys and payload stay small.
-  const {display,...summary}=m;
+  const {display,dailyFindings,...baseSummary}=m;
+  // Compact full daily series + calculated exceptions; excludes large nested diagnostic rows.
+  const {dailyEvidence,...summaryBase}=baseSummary;
+  const summary={...summaryBase,dailyEvidence,dailyFindings:{...dailyFindings,dayRows:undefined}};
   const cacheKey=JSON.stringify(summary);
   if(!force && aiResultCache.has(cacheKey)){
    aiShowResult(m,aiResultCache.get(cacheKey),'ai');
