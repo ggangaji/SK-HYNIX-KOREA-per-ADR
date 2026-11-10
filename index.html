@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.11</title>
+<title>닉스환율 지표추적자 v1.04.13</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,10 +25,20 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
+/* v1.04.13: Calculated locally; AI only interprets the metrics. */
+.ai-metrics{display:none;margin-top:14px}
+.ai-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ai-metric{padding:12px 8px;background:var(--card2);border:1px solid var(--line);border-radius:12px;text-align:center}
+.ai-metric small{display:block;color:var(--muted);font-size:10px;min-height:28px}
+.ai-metric strong{display:block;margin-top:5px;font-size:clamp(16px,4vw,22px)}
+.ai-meta{margin:8px 2px;color:var(--muted);font-size:11px}
+.ai-insight{margin-top:10px;padding:12px;background:#101b29;border-left:3px solid #6aa7ff;border-radius:8px;font-size:13px;line-height:1.65}
+.ai-output{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.65;margin-top:10px}
+@media(max-width:390px){.ai-grid{gap:5px}.ai-metric{padding:9px 4px}.ai-metric small{font-size:9px}}
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.11 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.13 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -49,18 +59,19 @@
 
 <div class="chart"><canvas id="chart"></canvas></div>
 
-<div class="ny-choice"><label><input type="checkbox" id="showNyxNewYork"> 닉스환율(뉴욕) 표시</label><span id="nyxNewYorkStatus" aria-live="polite"></span></div>
+<div class="ny-choice"><label><input type="checkbox" id="showNyxNewYork" checked> 닉스환율(뉴욕) 표시</label><span id="nyxNewYorkStatus" aria-live="polite"></span></div>
 <div class="note">미국 증시 공식 휴장일에는 SKHY 직전 정규장 종가를 사용해 한국장 15:30 일별값을 이어가며 US_CLOSED로 구분합니다.</div>
 </section>
 
 <section class="panel" id="nyxAiPanel" aria-label="닉스환율 AI 분석가">
   <h2>닉스환율 AI 분석가 <span style="font-size:11px;color:var(--muted);font-weight:500">K-EXAONE 2.5</span></h2>
-  <p class="note">현재 화면에 확보된 시세와 최근 일별 종가를 해석합니다. 버튼을 누를 때만 분석하며, D1 추가 조회는 하지 않습니다.</p>
-  <label for="nyxAiQuestion" class="label">분석 질문 (선택)</label>
-  <textarea id="nyxAiQuestion" maxlength="400" rows="2" placeholder="예: 최근 닉스환율 상승은 한국 주가 때문일까, ADR 때문일까?" style="margin-top:6px;width:100%;resize:vertical;background:#10151c;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px"></textarea>
+  <p class="note">한국장 15:30 닉스환율을 중심으로 원/달러 환율, 양국 주가, 닉스환율(뉴욕)의 최근 1개월 변화를 비교합니다. 미국장 종가가 아직 확정되지 않은 경우 최신 확정일을 따로 표시합니다. AI 호출은 버튼을 누를 때만 1회 실행합니다.</p>
+  <label for="nyxAiQuestion" class="label">추가로 궁금한 점 (선택)</label>
+  <textarea id="nyxAiQuestion" maxlength="400" rows="2" placeholder="예: 최근 1개월 중 양국 주가 차이가 확대된 시기는?" style="margin-top:6px;width:100%;resize:vertical;background:#10151c;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px"></textarea>
   <div class="actions"><button class="primary" id="nyxAiAnalyze">EXAONE으로 분석</button><button id="nyxAiClear">분석 내용 지우기</button></div>
   <div id="nyxAiState" class="note" role="status" aria-live="polite"></div>
-  <div id="nyxAiOutput" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.75;margin-top:10px" aria-live="polite"></div>
+  <div id="nyxAiMetrics" class="ai-metrics" aria-live="polite"></div>
+  <div id="nyxAiOutput" class="ai-output" aria-live="polite"></div>
   <div class="note">AI는 실시간 뉴스나 선물 수급을 자동 조회하지 않습니다. 분석 결과는 제공된 데이터의 해석이며 예측의 확정값이 아닙니다.</div>
 </section>
 </main>
@@ -69,7 +80,7 @@
 const WORKER='https://nyx-rate-proxy.duienugu.workers.dev', REFRESH=15000, $=id=>document.getElementById(id);
 let range='1mo', chart=null, last=null;
 let axisMode='dual';
-let showNyxNewYork=false, nyxNewYorkCache=null, nyxNewYorkCacheAt=0;
+let showNyxNewYork=true, nyxNewYorkCache=null, nyxNewYorkCacheAt=0;
 try{axisMode=localStorage.getItem('nyx-axis-mode')==='integrated'?'integrated':'dual'}catch{}
 let closeBaselineCache=null, closeBaselineAt=0;
 let historyCache=null, historyCacheAt=0;
@@ -473,7 +484,7 @@ async function loadNyxNewYorkPoints(force=false){
  const response=await nyxNewYork();
  if(!response?.ok)throw Error(response?.error||'New York daily close unavailable');
  nyxNewYorkCache=(response.points||[]).map(r=>({
-  date:String(r.date),t:Number(r.timestamp),ny:Number(r.nyx_rate)
+  date:String(r.date),t:Number(r.timestamp),ny:Number(r.nyx_rate),kr:Number(r.kr_close),us:Number(r.skhy_close)
  })).filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&Number.isFinite(r.t)&&r.ny>0);
  nyxNewYorkCacheAt=now;
  return nyxNewYorkCache;
@@ -526,38 +537,100 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 
-// v1.04.11 EXAONE AI: explicit user request, use existing in-memory snapshots only.
+// v1.04.13: Independently dated, precomputed five-indicator comparison; no AI-triggered D1 fetch.
 let nyxAiBusy=false;
+const aiPercent=n=>`${n>0?'+':''}${n.toFixed(2)}%`;
+function aiMonthSeries(rows, fields){
+ const valid=rows.filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&fields.every(k=>Number.isFinite(r[k])&&r[k]>0))
+  .sort((a,b)=>a.date.localeCompare(b.date));
+ if(valid.length<2)return null;
+ const last=valid[valid.length-1],cutoff=Date.parse(last.date+'T00:00:00+09:00')-30*86400000;
+ const eligible=valid.filter(r=>Date.parse(r.date+'T00:00:00+09:00')>=cutoff);
+ if(eligible.length<2)return null;
+ const first=eligible[0],spanDays=Math.round((Date.parse(last.date+'T00:00:00+09:00')-Date.parse(first.date+'T00:00:00+09:00'))/86400000);
+ if(spanDays<14)return null; // Don't describe a very short history as a monthly comparison.
+ const result={start:first.date,end:last.date,count:eligible.length,spanDays};
+ for(const f of fields){result[f]={first:first[f],last:last[f],change:100*(last[f]/first[f]-1)};}
+ return result;
+}
+function aiMetricColor(v){return v>0?'#ff6677':v<0?'#6aa7ff':'var(--text)'}
+function aiRenderMetrics(m){
+ const el=$('nyxAiMetrics');el.replaceChildren();el.style.display='block';
+ const grid=document.createElement('div');grid.className='ai-grid';
+ const add=(name,rec,subtitle)=>{
+  const item=document.createElement('div');item.className='ai-metric';
+  const label=document.createElement('small');label.textContent=name;
+  const val=document.createElement('strong');val.textContent=aiPercent(rec.change);val.style.color=aiMetricColor(rec.change);
+  const note=document.createElement('small');note.textContent=subtitle;note.style.minHeight='0';note.style.marginTop='5px';
+  item.append(label,val,note);grid.append(item);
+ };
+ add('닉스환율',m.seoul.n,'한국장 15:30');
+ add('원/달러 환율',m.seoul.x,'한국장 15:30');
+ add('한국 SK하이닉스',m.newyork.kr,'한국 정규장 종가');
+ add('미국 SKHY',m.newyork.us,'미국 정규장 종가');
+ add('닉스환율(뉴욕)',m.newyork.ny,'양국 정규장 종가');
+ const meta=document.createElement('div');meta.className='ai-meta';
+ meta.textContent=`한국장 기준 ${m.seoul.start} ~ ${m.seoul.end} (${m.seoul.count}건) · 뉴욕 기준 ${m.newyork.start} ~ ${m.newyork.end} (${m.newyork.count}건)`;
+ el.append(grid,meta);
+ if(m.seoul.end>m.newyork.end){
+  const notice=document.createElement('div');notice.className='ai-meta';
+  notice.textContent=`미국장 최신 확정일은 ${m.newyork.end}입니다. 종료일이 다른 두 기간의 등락률을 동일 기간 성과로 직접 비교하지 않습니다.`;
+  el.append(notice);
+ }
+ if(m.overlap){
+  const overlap=document.createElement('div');overlap.className='ai-meta';
+  overlap.textContent=`공통 거래일 비교 ${m.overlap.start} ~ ${m.overlap.end}: 닉스환율 ${aiPercent(m.overlap.seoulChange)}, 닉스환율(뉴욕) ${aiPercent(m.overlap.newyorkChange)} (동일 날짜 기준)`;
+  el.append(overlap);
+ }
+}
+function aiPrepareComparison(seoulRows,newYorkRows){
+ const seoul=aiMonthSeries(seoulRows,['n','x']);
+ const newyork=aiMonthSeries(newYorkRows,['kr','us','ny']);
+ if(!seoul||!newyork)throw Error('1개월 비교에 필요한 확정 종가가 부족합니다 (최소 14일 이상의 관측 기간 필요).');
+ // The overlapping pair is strictly date-matched. Do not interpret independently ending periods as the same window.
+ const nyMap=new Map(newYorkRows.map(r=>[r.date,r]));
+ const common=seoulRows.filter(r=>r.date>=seoul.start&&r.date<=seoul.end&&r.date>=newyork.start&&r.date<=newyork.end)
+  .map(r=>({...r,ny:nyMap.get(r.date)?.ny}));
+ const both=aiMonthSeries(common,['n','ny']);
+ return {seoul,newyork,overlap:both?{start:both.start,end:both.end,count:both.count,
+  seoulFirst:both.n.first,seoulLast:both.n.last,seoulChange:both.n.change,
+  newyorkFirst:both.ny.first,newyorkLast:both.ny.last,newyorkChange:both.ny.change}:null};
+}
 $('nyxAiAnalyze').addEventListener('click',async()=>{
  if(nyxAiBusy)return;
- let pass='';
- try{pass=sessionStorage.getItem('nyx-ai-access')||''}catch{}
+ let pass='';try{pass=sessionStorage.getItem('nyx-ai-access')||''}catch{}
  if(!pass){pass=prompt('닉스환율 AI 분석 접근 암호를 입력하세요 (Cloudflare NYX_AI_ACCESS_TOKEN)')||'';if(!pass)return;}
- const current=last?{nyx:last.n,kr:last.k,skhy:last.u,usdkrw:last.x,basis:last.mode}:{};
- const days=(Array.isArray(dailyPointsCache)?dailyPointsCache:[]).slice(-35).map(p=>({
-  date:p.date,nyx:p.n,usdkrw:p.x,
-  nyxNewYork:nyxNewYorkCache?.find(q=>q.date===p.date)?.ny??null
- }));
  const button=$('nyxAiAnalyze');nyxAiBusy=true;button.disabled=true;
- $('nyxAiState').textContent='EXAONE 분석 요청 중…';
+ $('nyxAiState').textContent='1개월 확정 종가 비교 계산 중…';
  try{
+  // The daily close history has already been requested by the visible chart.
+  // Never issue an additional D1 request from AI analysis.
+  const seoulRows=dailyPointsCache;
+  if(!seoulRows?.length)throw Error('일별종가 그래프 데이터 로딩이 완료된 후 분석해 주세요.');
+  const nyRows=await loadNyxNewYorkPoints(); // cached Yahoo; no D1.
+  const m=aiPrepareComparison(seoulRows,nyRows);
+  aiRenderMetrics(m);
+  $('nyxAiOutput').textContent='';
+  $('nyxAiState').textContent='EXAONE 핵심 해석 요청 중…';
   const ctl=new AbortController();const timer=setTimeout(()=>ctl.abort(),70000);
   let res;
   try{res=await fetch(WORKER+'/ai-analyze',{
    method:'POST',headers:{'Content-Type':'application/json','X-NYX-AI-Access':pass},
-   body:JSON.stringify({current,daily:days,question:$('nyxAiQuestion').value}),signal:ctl.signal,cache:'no-store'
+   body:JSON.stringify({summary:m,question:$('nyxAiQuestion').value}),
+   signal:ctl.signal,cache:'no-store'
   });}finally{clearTimeout(timer)}
   const data=await res.json();
   if(!res.ok||!data.ok)throw Error(data.error||`HTTP ${res.status}`);
-  $('nyxAiOutput').textContent=data.answer;
-  $('nyxAiState').textContent=`분석 완료 · ${new Date().toLocaleString('ko-KR')} · ${days.length}개 일별 기록 제공`;
+  const insight=document.createElement('div');insight.className='ai-insight';insight.textContent=data.answer;
+  $('nyxAiOutput').replaceChildren(insight);
+  $('nyxAiState').textContent=`분석 완료 · ${new Date().toLocaleString('ko-KR')} · EXAONE 1회 호출`;
   try{sessionStorage.setItem('nyx-ai-access',pass)}catch{}
  }catch(e){
   $('nyxAiState').textContent='분석 실패: '+(e.name==='AbortError'?'요청 시간 초과':e.message);
   if(/접근 암호/.test(e.message)){try{sessionStorage.removeItem('nyx-ai-access')}catch{}}
  }finally{nyxAiBusy=false;button.disabled=false;}
 });
-$('nyxAiClear').addEventListener('click',()=>{$('nyxAiOutput').textContent='';$('nyxAiState').textContent='';});
+$('nyxAiClear').addEventListener('click',()=>{$('nyxAiMetrics').replaceChildren();$('nyxAiMetrics').style.display='none';$('nyxAiOutput').replaceChildren();$('nyxAiState').textContent='';});
 
 update();loadChart();
 setInterval(update,REFRESH);
