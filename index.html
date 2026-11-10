@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.14</title>
+<title>닉스환율 지표추적자 v1.04.15</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,7 +25,7 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-/* v1.04.14: compact comparison dashboard + period controls */
+/* v1.04.15: compact comparison dashboard + period controls */
 .ai-period{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 12px}
 .ai-period label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text)}
 .ai-period input{accent-color:var(--accent)}
@@ -50,7 +50,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.14 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.15 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -556,10 +556,10 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 
-// v1.04.14: Period selection performs one EXAONE call, never an AI D1 query.
+// v1.04.15: Period selection performs one EXAONE call, never an AI D1 query.
 let nyxAiBusy=false, aiPeriod='1mo';
 const aiResultCache=new Map();
-const aiPercent=n=>`${n>0?'+':''}${Number(n).toFixed(2)}%`;
+const aiPercent=n=>Number.isFinite(n)?`${n>0?'+':''}${Number(n).toFixed(2)}%`:'—';
 const aiSpanDays=(a,b)=>Math.round((Date.parse(b+'T00:00:00+09:00')-Date.parse(a+'T00:00:00+09:00'))/86400000);
 const aiPeriodDays={ '1w':7,'1mo':30,'3mo':90 };
 const aiPeriodNames={ '1w':'1주일','1mo':'1개월','3mo':'3개월' };
@@ -600,7 +600,7 @@ function aiRenderMetrics(m){
  meta.textContent=`한국장 ${m.seoul.start} ~ ${m.seoul.end} (${m.seoul.count}건) · 뉴욕 ${m.newyork.start} ~ ${m.newyork.end} (${m.newyork.count}건)`;
  el.append(heading,grid,meta);
  if(m.seoul.end!==m.newyork.end){const note=document.createElement('div');note.className='ai-meta';note.textContent='※ 한국장과 미국장의 확정 종료일이 다릅니다. 두 기간의 등락률을 동일 기간 성과로 직접 비교하지 않습니다.';el.append(note)}
- if(m.overlap){const o=document.createElement('div');o.className='ai-meta';o.textContent=`공통 거래일 ${o.start}~${o.end}: 닉스환율 ${aiPercent(o.seoulChange)} · 뉴욕 ${aiPercent(o.newyorkChange)}`;el.append(o)}
+ if(m.overlap){const o=document.createElement('div');o.className='ai-meta';o.textContent=`공통 거래일 ${m.overlap.start} ~ ${m.overlap.end}: 닉스환율 ${aiPercent(m.overlap.seoulChange)} · 뉴욕 ${aiPercent(m.overlap.newyorkChange)}`;el.append(o)}else{const o=document.createElement('div');o.className='ai-meta';o.textContent='공통 거래일 비교: 유효한 일별 데이터가 부족하여 생략합니다.';el.append(o)}
 }
 function aiPrepareComparison(seoulRows,nyRows,period){
  const seoul=aiPeriodSeries(seoulRows,['n','x'],period);
