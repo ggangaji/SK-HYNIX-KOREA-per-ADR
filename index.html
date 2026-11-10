@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.18</title>
+<title>닉스환율 지표추적자 v1.04.19</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,7 +25,7 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-/* v1.04.18: compact comparison dashboard + period controls */
+/* v1.04.19: compact comparison dashboard + period controls */
 .ai-period{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 12px}
 .ai-period label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text)}
 .ai-period input{accent-color:var(--accent)}
@@ -68,7 +68,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.18 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.19 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -570,7 +570,7 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 
-// v1.04.18: Browser-side pattern diagnostics; AI only interprets verified features.
+// v1.04.19: Browser-side pattern diagnostics; AI only interprets verified features.
 let nyxAiBusy=false, aiPeriod='today';
 const aiResultCache=new Map();
 const aiPercent=n=>Number.isFinite(n)?`${n>0?'+':''}${n.toFixed(2)}%`:'—';
@@ -636,7 +636,7 @@ function aiPatternDiagnostics(commonRows){
   // Direction of NYK premium relative to the Korea-close observation, not a USD/KRW FX rate.
   mostRecentNewYorkBelowSeoul:latestSpreadPct<0};
 }
-// v1.04.18 - full five-indicator daily analysis using cached Seoul/New York observations.
+// v1.04.19 - full five-indicator daily analysis using cached Seoul/New York observations.
 // Values are transported as a bounded daily series, not interpreted as causal proof.
 function aiDailyEvidence(seoulRows,nyRows,period){
  const nyMap=new Map(nyRows.filter(r=>aiIsDate(r.date)&&r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
@@ -815,7 +815,7 @@ async function aiRun(force=false){
    $('nyxAiState').textContent=`${aiPeriodNames[period]} · 이전 분석 결과 재사용 (API 추가 호출 없음)`;return;
   }
   $('nyxAiState').textContent=`${aiPeriodNames[period]} · EXAONE 해석 요청 중…`;
-  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),70000);
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),67000);
   let res,data;
   try{
    res=await fetch(WORKER+'/ai-analyze',{method:'POST',headers:{'Content-Type':'application/json','X-NYX-AI-Access':pass},
