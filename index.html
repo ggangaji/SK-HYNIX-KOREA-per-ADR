@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.28</title>
+<title>닉스환율 지표추적자 v1.04.30</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,7 +25,7 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-/* v1.04.28: compact comparison dashboard + period controls */
+/* v1.04.30: compact comparison dashboard + period controls */
 .ai-period{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 12px}
 .ai-period label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text)}
 .ai-period input{accent-color:var(--accent)}
@@ -70,13 +70,19 @@
 .ai-pattern-desc{font-size:11px;line-height:1.5;margin-top:5px}
 @media(max-width:400px){.ai-pattern-grid{grid-template-columns:1fr}}
 @media(max-width:450px){.ai-spark{width:62px;flex-basis:62px;height:42px}.ai-metric.fx-alone .ai-spark{width:75px;flex-basis:75px}}
+.ai-diagnostics{margin-top:15px;border-top:1px solid var(--line);padding-top:7px;color:var(--muted);font-size:11px}
+.ai-diagnostics summary{display:list-item;width:fit-content;margin-left:auto;cursor:pointer;opacity:.68;padding:4px 0}
+.ai-diagnostics summary:hover,.ai-diagnostics summary:focus-visible{opacity:1}
+.ai-diagnostics-body{margin-top:9px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card2)}
+.ai-diagnostics-body button{font-size:11px;padding:8px 10px;width:100%;font-weight:600}
+.ai-diagnostics-body .note{overflow-wrap:anywhere}
 .ai-detail-toggle{display:block;margin-top:12px;color:var(--muted);font-size:11px;cursor:pointer}
 .ai-detail-toggle textarea{margin-top:8px;width:100%;resize:vertical;background:#10151c;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px}
 @media(max-width:390px){.ai-grid{gap:6px}.ai-metric{padding:11px 9px}.ai-metric small{font-size:10px}}
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.28 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.30 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -117,6 +123,13 @@
  <div id="nyxAiMetrics" class="ai-metrics" aria-live="polite"></div>
  <div id="nyxAiOutput" class="ai-output" aria-live="polite"></div>
  <div class="note">분석 수치는 화면의 확정 종가에서 계산합니다. 미국장 미확정일은 제외하며, AI는 뉴스·수급을 자동 조회하지 않습니다.</div>
+ <details class="ai-diagnostics" id="nyxAiDiagnostics">
+  <summary>진단 · 고급 기능</summary>
+  <div class="ai-diagnostics-body">
+   <button id="nyxAiDiagnose" type="button">EXAONE 연결 진단 (API 1회 사용)</button>
+   <div id="nyxAiDiagResult" class="note" role="status" aria-live="polite"></div>
+  </div>
+ </details>
 </section>
 </main>
 
@@ -584,7 +597,7 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 
-// v1.04.28: Browser-side pattern diagnostics; AI only interprets verified features.
+// v1.04.30: Browser-side pattern diagnostics; AI only interprets verified features.
 let nyxAiBusy=false, aiPeriod='today';
 const aiResultCache=new Map();
 const aiPercent=n=>Number.isFinite(n)?`${n>0?'+':''}${n.toFixed(2)}%`:'—';
@@ -650,7 +663,7 @@ function aiPatternDiagnostics(commonRows){
   // Direction of NYK premium relative to the Korea-close observation, not a USD/KRW FX rate.
   mostRecentNewYorkBelowSeoul:latestSpreadPct<0};
 }
-// v1.04.28 - full five-indicator daily analysis using cached Seoul/New York observations.
+// v1.04.30 - full five-indicator daily analysis using cached Seoul/New York observations.
 // Values are transported as a bounded daily series, not interpreted as causal proof.
 function aiDailyEvidence(seoulRows,nyRows,period){
  const nyMap=new Map(nyRows.filter(r=>aiIsDate(r.date)&&r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
@@ -816,7 +829,7 @@ function aiPrepareComparison(seoulRows,nyRows,period){
   newyork:nyRows.filter(r=>r.date>=newyork.start&&r.date<=newyork.end)
  }};
 }
-// v1.04.28: Today's analysis must use the confirmed 15:30 KST D1 row, never the prior US close.
+// v1.04.30: Today's analysis must use the confirmed 15:30 KST D1 row, never the prior US close.
 function aiPrepareToday(rows){
  const valid=rows.filter(r=>aiIsDate(r.date)&&r.n>0&&r.x>0&&r.kr>0&&r.sk>0)
   .sort((a,b)=>a.date.localeCompare(b.date));
@@ -1019,6 +1032,28 @@ document.querySelectorAll('[name=aiPeriod]').forEach(r=>r.addEventListener('chan
  if(r.checked){aiPeriod=r.value;$('nyxAiState').textContent=`${aiPeriodNames[aiPeriod]} 선택 · 분석 버튼을 눌러 주세요.`;}
 }));
 $('nyxAiAnalyze').addEventListener('click',()=>aiRun(false));
+// One-shot EXAONE diagnostic: no automatic retries, no user market data sent.
+$('nyxAiDiagnose').addEventListener('click',async()=>{
+ if(nyxAiBusy)return;
+ const btn=$('nyxAiDiagnose'),analyze=$('nyxAiAnalyze'),out=$('nyxAiDiagResult');
+ let pass='';try{pass=sessionStorage.getItem('nyx-ai-access')||''}catch{}
+ if(!pass){pass=prompt('EXAONE 진단 접근 암호를 입력하세요')||'';if(!pass)return;}
+ nyxAiBusy=true;btn.disabled=true;analyze.disabled=true;btn.textContent='진단 중…';
+ out.textContent='API 호출 1회로 연결을 확인하고 있습니다. 기존 분석은 실행하지 않습니다.';
+ const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),19000);
+ try{
+  const res=await fetch(WORKER+'/ai-diagnose',{method:'POST',headers:{'X-NYX-AI-Access':pass},signal:ctl.signal,cache:'no-store'});
+  const d=await res.json();
+  if(!res.ok)throw Error(d.error||'진단 요청 실패 (HTTP '+res.status+')');
+  if(d.classification==='provider_busy'){
+   out.textContent='EXAONE 서버가 짧은 진단 요청도 거절했습니다 (429). '+(d.providerDescription||'서버 혼잡')+' · '+formatExaone429(d).replace(/^ · /,'')+' · 분석 프롬프트나 시세 데이터 때문이라고 볼 근거는 없습니다.';
+  }else if(d.ok){
+   out.textContent='EXAONE 진단 요청 접수 ('+Math.round((d.elapsedMs||0)/1000)+'초). '+(d.modelResponded?'짧은 최종 답변까지 확인했습니다.':'API가 요청을 수락했지만 최종 답변은 확인되지 않았습니다.')+' 복잡한 분석의 성공 여부와는 별개입니다.';
+  }else{out.textContent='진단 실패: '+(d.error||d.providerDescription||d.classification||'원인 미확인')+(d.httpStatus?' (HTTP '+d.httpStatus+')':'');}
+  if(d.ok){try{sessionStorage.setItem('nyx-ai-access',pass)}catch{}}
+ }catch(e){out.textContent='진단 중 오류: '+(e.name==='AbortError'?'브라우저 19초 제한시간 초과':e.message);}
+ finally{clearTimeout(timer);ctl.abort();nyxAiBusy=false;btn.disabled=false;analyze.disabled=false;btn.textContent='EXAONE 연결 진단 (API 1회 사용)';}
+});
 
 update();loadChart();
 setInterval(update,REFRESH);
