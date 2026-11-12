@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.26</title>
+<title>닉스환율 지표추적자 v1.04.27</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,7 +25,7 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-/* v1.04.26: compact comparison dashboard + period controls */
+/* v1.04.27: compact comparison dashboard + period controls */
 .ai-period{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 12px}
 .ai-period label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text)}
 .ai-period input{accent-color:var(--accent)}
@@ -76,7 +76,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.26 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.27 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -97,7 +97,6 @@
 
 <div class="chart"><canvas id="chart"></canvas></div>
 
-<div class="ny-choice"><label><input type="checkbox" id="showNyxNewYork" checked> 닉스환율(뉴욕) 표시</label><span id="nyxNewYorkStatus" aria-live="polite"></span></div>
 <div class="note">미국 증시 공식 휴장일에는 SKHY 직전 정규장 종가를 사용해 한국장 15:30 일별값을 이어가며 US_CLOSED로 구분합니다.</div>
 </section>
 
@@ -125,7 +124,7 @@
 const WORKER='https://nyx-rate-proxy.duienugu.workers.dev', REFRESH=15000, $=id=>document.getElementById(id);
 let range='1mo', chart=null, last=null;
 let axisMode='dual';
-let showNyxNewYork=true, nyxNewYorkCache=null, nyxNewYorkCacheAt=0;
+let nyxNewYorkCache=null, nyxNewYorkCacheAt=0;
 try{axisMode=localStorage.getItem('nyx-axis-mode')==='integrated'?'integrated':'dual'}catch{}
 let closeBaselineCache=null, closeBaselineAt=0;
 let historyCache=null, historyCacheAt=0;
@@ -485,7 +484,7 @@ function render(p){
     datasets:[
      {label:'닉스환율',data:nyxData,borderColor:'#6aa7ff',backgroundColor:'#6aa7ff',yAxisID:'y',borderWidth:2,pointRadius:0,tension:.15},
      {label:'USD/KRW',data:fxData,borderColor:'#f4a261',backgroundColor:'#f4a261',yAxisID:axisMode==='dual'?'yFx':'y',borderWidth:1.5,pointRadius:0,tension:.15},
-     {label:'닉스환율(뉴욕)',data:p.map(q=>q.ny??null),borderColor:'#b38bff',backgroundColor:'#b38bff',yAxisID:'y',borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHitRadius:12,tension:.15,spanGaps:false,hidden:!showNyxNewYork}
+     {label:'닉스환율(뉴욕)',data:p.map(q=>q.ny??null),borderColor:'#b38bff',backgroundColor:'#b38bff',yAxisID:'y',borderWidth:2,pointRadius:0,pointHoverRadius:5,pointHitRadius:12,tension:.15,spanGaps:false,hidden:false}
     ]
    },
    options:{
@@ -514,7 +513,7 @@ function render(p){
  chart.data.datasets[0].data=nyxData;
  chart.data.datasets[1].data=fxData;
  chart.data.datasets[2].data=p.map(q=>q.ny??null);
- chart.data.datasets[2].hidden=!showNyxNewYork;
+ chart.data.datasets[2].hidden=false;
  applyAxisMode();
 }
 let dailyPointsCache=null, dailyPointsCacheAt=0;
@@ -555,18 +554,14 @@ async function loadChart(force=false){
  try{
   const all=await loadDailyPoints(force);
   let composed=all;
-  const statusEl=$('nyxNewYorkStatus');
-  if(showNyxNewYork){
-   try{
-    const ny=await loadNyxNewYorkPoints(force);
-    composed=mergeNewYorkPoints(all,ny);
-    statusEl.textContent=ny.length?` · ${ny.length}거래일`:' · 데이터 없음';
-   }catch(e){
-    console.warn('NYX New York close unavailable',e);
-    statusEl.textContent=' · 뉴욕 데이터 조회 실패';
-    // Keep the original chart usable even if Yahoo fails.
-   }
-  }else statusEl.textContent='';
+  // The New York comparison series is always enabled; no extra toggle is needed.
+  try{
+   const ny=await loadNyxNewYorkPoints(force);
+   composed=mergeNewYorkPoints(all,ny);
+  }catch(e){
+   console.warn('NYX New York close unavailable',e);
+   // Preserve the Seoul chart if the New York endpoint is unavailable.
+  }
   const now=Date.now();
   const cutoff=range==='1w'?now-7*86400000:range==='1mo'?now-30*86400000:0;
   const p=composed.filter(q=>q.t>=cutoff);
@@ -579,7 +574,6 @@ async function loadChart(force=false){
 }
 
 
-$('showNyxNewYork').addEventListener('change',e=>{showNyxNewYork=!!e.target.checked;loadChart()});
 document.querySelectorAll('[name=axisMode]').forEach(r=>{r.checked=r.value===axisMode;r.addEventListener('change',()=>{if(!r.checked)return;axisMode=r.value;try{localStorage.setItem('nyx-axis-mode',axisMode)}catch{}applyAxisMode()})});
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
 $('refresh').onclick=()=>{update();loadChart(true)};
@@ -590,7 +584,7 @@ USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
 0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
 
 
-// v1.04.26: Browser-side pattern diagnostics; AI only interprets verified features.
+// v1.04.27: Browser-side pattern diagnostics; AI only interprets verified features.
 let nyxAiBusy=false, aiPeriod='today';
 const aiResultCache=new Map();
 const aiPercent=n=>Number.isFinite(n)?`${n>0?'+':''}${n.toFixed(2)}%`:'—';
@@ -656,7 +650,7 @@ function aiPatternDiagnostics(commonRows){
   // Direction of NYK premium relative to the Korea-close observation, not a USD/KRW FX rate.
   mostRecentNewYorkBelowSeoul:latestSpreadPct<0};
 }
-// v1.04.26 - full five-indicator daily analysis using cached Seoul/New York observations.
+// v1.04.27 - full five-indicator daily analysis using cached Seoul/New York observations.
 // Values are transported as a bounded daily series, not interpreted as causal proof.
 function aiDailyEvidence(seoulRows,nyRows,period){
  const nyMap=new Map(nyRows.filter(r=>aiIsDate(r.date)&&r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
@@ -822,7 +816,7 @@ function aiPrepareComparison(seoulRows,nyRows,period){
   newyork:nyRows.filter(r=>r.date>=newyork.start&&r.date<=newyork.end)
  }};
 }
-// v1.04.26: Today's analysis must use the confirmed 15:30 KST D1 row, never the prior US close.
+// v1.04.27: Today's analysis must use the confirmed 15:30 KST D1 row, never the prior US close.
 function aiPrepareToday(rows){
  const valid=rows.filter(r=>aiIsDate(r.date)&&r.n>0&&r.x>0&&r.kr>0&&r.sk>0)
   .sort((a,b)=>a.date.localeCompare(b.date));
@@ -891,6 +885,22 @@ function aiShowResult(m,answer,mode){
  const heading=document.createElement('div');heading.className='ai-analysis-head';heading.textContent=mode==='ai'?'✦ EXAONE 핵심 해석':'참고 · 프로그램 계산 해석 (AI 아님)';
  const body=document.createElement('div');body.className='ai-insight';body.textContent=answer;
  card.append(heading,body);$('nyxAiOutput').append(card);
+}
+function formatExaone429(d){
+ const r=d.rateLimit||{};
+ const items=[];
+ for(const [name,key] of [['초당 잔여','secondRemaining'],['분당 잔여','minuteRemaining'],['일일 잔여','dayRemaining']]){
+  if(r[key]!==null&&r[key]!==undefined&&/^\d+$/.test(String(r[key])))items.push(name+' '+r[key]+'회');
+ }
+ if(r.retryAfterMs!==null&&r.retryAfterMs!==undefined&&Number.isFinite(Number(r.retryAfterMs))){
+  const seconds=Math.ceil(Number(r.retryAfterMs)/1000);
+  items.push('재시도 권고 '+seconds+'초 후');
+ }else if(r.retryAfter){
+  const raw=String(r.retryAfter).trim();
+  if(/^\d+(?:\.\d+)?$/.test(raw))items.push('재시도 권고 '+Math.ceil(Number(raw))+'초 후');
+  else if(Number.isFinite(Date.parse(raw)))items.push('재시도 권고 '+new Date(raw).toLocaleString('ko-KR'));
+ }
+ return items.length?' · '+items.join(' · '):' · 제한 상세정보 미제공 (초/분/일 중 원인 미확인)';
 }
 async function aiRun(force=false){
  const period=aiPeriod;
@@ -965,7 +975,8 @@ async function aiRun(force=false){
      $('nyxAiProgressTitle').textContent='EXAONE 최종 답변 수신 중';
      $('nyxAiProgressDesc').textContent='최종 답변 조각이 도착하고 있습니다. 완료 후 분석 결과를 표시합니다.';
     }else if(eventName==='error'){
-     throw Error(d.error||'EXAONE 스트리밍 오류');
+     const detail=d.upstreamStatus===429?formatExaone429(d):'';
+     throw Error((d.error||'EXAONE 스트리밍 오류')+detail);
     }else if(eventName==='result'){
      if(!d.ok||!d.answer)throw Error('EXAONE 최종 결과가 비어 있습니다.');
      data=d;receivedResult=true;
