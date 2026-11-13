@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.32</title>
+<title>닉스환율 지표추적자 v1.04.33</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -82,7 +82,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.31 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.33 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -164,7 +164,7 @@ async function historyData(preset){return jget(`${WORKER}/history?preset=${prese
 async function dbHistory(range){return jget(`${WORKER}/db-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
 async function latestSync(){return jget(`${WORKER}/latest-sync?t=${Date.now()}`,20000)}
 async function currentRate(){return jget(`${WORKER}/current-rate?t=${Date.now()}`,20000)}
-async function nyxNewYork(){return jget(`${WORKER}/nyx-new-york?schema=10431`,20000)}
+async function nyxNewYork(){return jget(`${WORKER}/nyx-new-york?schema=10433`,20000)}
 async function dailyClose(days=45){return jget(`${WORKER}/daily-close?days=${days}&t=${Date.now()}`,20000)}
 async function repairDailyClose(date=''){return jget(`${WORKER}/repair-daily-close${date?`?date=${encodeURIComponent(date)}`:''}`,20000)}
 async function wsPrice(){try{return await jget(WORKER,17000)}catch{return null}}
@@ -576,10 +576,12 @@ async function loadChart(force=false){
    const d=nyxNewYorkDiagnostics;
    const target=$('nyxNyStatus');
    if(target){
-     if(d?.latestDateStatus==='US_DAILY_BAR_MISSING')target.textContent=`뉴욕 지표 ${d.expectedDate} 확인 중 · Yahoo 미국 일봉 미반영${d.fallbackAttempted?' (추가 조회 완료)':''}. 미국 휴장 또는 제공 지연일 수 있습니다. D1 추가 조회 없음.`;
-     else if(d?.latestDateStatus==='KR_DAILY_BAR_MISSING')target.textContent=`뉴욕 지표 확인 중 · Yahoo 한국 일봉 미반영 (추가 조회 완료). 한국 휴장 또는 제공 지연일 수 있습니다. D1 추가 조회 없음.`;
-     else if(d?.latestMatchedDate)target.textContent=`뉴욕 지표 최신 확정일 ${d.latestMatchedDate} · Yahoo 일별 종가 기준`;
-     else target.textContent='뉴욕 지표 확인 중';
+     if(d?.latestDateStatus==='CANDIDATE_MISSING'){
+       const missing=(d.missingAfterRetry||[]).map(x=>x==='KR'?'한국 SK하이닉스':'미국 SKHY').join('·');
+       target.textContent=`뉴욕 지표 ${d.candidateDate||'최신일'} 확인 대기 · ${missing||'일봉'} 자료가 Yahoo 재조회 후에도 확인되지 않았습니다. 최신 매칭 ${d.latestMatchedDate||'없음'} · 휴장/제공 지연 여부 확인 필요 · D1 조회 없음`;
+     }else if(d?.latestMatchedDate){
+       target.textContent=`뉴욕 지표 최신 확정일 ${d.latestMatchedDate} · 양국 Yahoo 일봉 매칭 완료`;
+     }else target.textContent='뉴욕 지표 확인 중';
    }
   }catch(e){
    console.warn('NYX New York close unavailable',e);
