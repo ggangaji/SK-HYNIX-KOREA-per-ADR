@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0f14">
-<title>닉스환율 지표추적자 v1.04.30</title>
+<title>닉스환율 지표추적자 v1.04.32</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -25,7 +25,7 @@
 .ny-choice{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:12px;color:var(--muted)}
 .ny-choice input{accent-color:#b38bff;width:15px;height:15px} .ny-choice label{cursor:pointer;display:inline-flex;align-items:center;gap:7px}
 .nyx-change{text-align:center;font-size:15px;font-weight:800;min-height:20px;margin-top:6px}.nyx-change-note{text-align:center;color:var(--muted);font-size:11px;min-height:16px;margin-top:3px}
-/* v1.04.30: compact comparison dashboard + period controls */
+/* v1.04.31: compact comparison dashboard + period controls */
 .ai-period{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0 12px}
 .ai-period label{display:inline-flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;color:var(--text)}
 .ai-period input{accent-color:var(--accent)}
@@ -82,7 +82,7 @@
 </style>
 </head>
 <body><main class="wrap">
-<div class="top">닉스환율 지표추적자 v1.04.30 · SK hynix Korea / ADR</div>
+<div class="top">닉스환율 지표추적자 v1.04.31 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -104,6 +104,7 @@
 <div class="chart"><canvas id="chart"></canvas></div>
 
 <div class="note">미국 증시 공식 휴장일에는 SKHY 직전 정규장 종가를 사용해 한국장 15:30 일별값을 이어가며 US_CLOSED로 구분합니다.</div>
+<div id="nyxNyStatus" class="note" aria-live="polite"></div>
 </section>
 
 <section class="panel" id="nyxAiPanel" aria-label="닉스환율 AI 분석가">
@@ -137,7 +138,7 @@
 const WORKER='https://nyx-rate-proxy.duienugu.workers.dev', REFRESH=15000, $=id=>document.getElementById(id);
 let range='1mo', chart=null, last=null;
 let axisMode='dual';
-let nyxNewYorkCache=null, nyxNewYorkCacheAt=0;
+let nyxNewYorkCache=null, nyxNewYorkCacheAt=0, nyxNewYorkCacheTtl=1800000, nyxNewYorkDiagnostics=null;
 try{axisMode=localStorage.getItem('nyx-axis-mode')==='integrated'?'integrated':'dual'}catch{}
 let closeBaselineCache=null, closeBaselineAt=0;
 let historyCache=null, historyCacheAt=0;
@@ -163,7 +164,7 @@ async function historyData(preset){return jget(`${WORKER}/history?preset=${prese
 async function dbHistory(range){return jget(`${WORKER}/db-history?range=${encodeURIComponent(range)}&t=${Date.now()}`,20000)}
 async function latestSync(){return jget(`${WORKER}/latest-sync?t=${Date.now()}`,20000)}
 async function currentRate(){return jget(`${WORKER}/current-rate?t=${Date.now()}`,20000)}
-async function nyxNewYork(){return jget(`${WORKER}/nyx-new-york`,20000)}
+async function nyxNewYork(){return jget(`${WORKER}/nyx-new-york?schema=10431`,20000)}
 async function dailyClose(days=45){return jget(`${WORKER}/daily-close?days=${days}&t=${Date.now()}`,20000)}
 async function repairDailyClose(date=''){return jget(`${WORKER}/repair-daily-close${date?`?date=${encodeURIComponent(date)}`:''}`,20000)}
 async function wsPrice(){try{return await jget(WORKER,17000)}catch{return null}}
@@ -543,14 +544,15 @@ async function loadDailyPoints(force=false){
 }
 async function loadNyxNewYorkPoints(force=false){
  const now=Date.now();
- // Yahoo history is fetched only if the user explicitly enables this series.
- // Cache locally for 30 minutes; Worker endpoint independently caches upstream Yahoo.
- if(!force && nyxNewYorkCache && now-nyxNewYorkCacheAt<1800000)return nyxNewYorkCache;
+ // Reuse recent data; incomplete latest dates receive a short TTL.
+ if(!force && nyxNewYorkCache && now-nyxNewYorkCacheAt<nyxNewYorkCacheTtl)return nyxNewYorkCache;
  const response=await nyxNewYork();
  if(!response?.ok)throw Error(response?.error||'New York daily close unavailable');
  nyxNewYorkCache=(response.points||[]).map(r=>({
   date:String(r.date),t:Number(r.timestamp),ny:Number(r.nyx_rate),kr:Number(r.kr_close),us:Number(r.skhy_close)
  })).filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&Number.isFinite(r.t)&&r.ny>0);
+ nyxNewYorkDiagnostics=response.diagnostics||null;
+ nyxNewYorkCacheTtl=Math.max(30000,Math.min(1800000,Number(response.diagnostics?.cacheTtlSeconds||1800)*1000));
  nyxNewYorkCacheAt=now;
  return nyxNewYorkCache;
 }
@@ -571,8 +573,17 @@ async function loadChart(force=false){
   try{
    const ny=await loadNyxNewYorkPoints(force);
    composed=mergeNewYorkPoints(all,ny);
+   const d=nyxNewYorkDiagnostics;
+   const target=$('nyxNyStatus');
+   if(target){
+     if(d?.latestDateStatus==='US_DAILY_BAR_MISSING')target.textContent=`뉴욕 지표 ${d.expectedDate} 확인 중 · Yahoo 미국 일봉 미반영${d.fallbackAttempted?' (추가 조회 완료)':''}. 미국 휴장 또는 제공 지연일 수 있습니다. D1 추가 조회 없음.`;
+     else if(d?.latestDateStatus==='KR_DAILY_BAR_MISSING')target.textContent=`뉴욕 지표 확인 중 · Yahoo 한국 일봉 미반영 (추가 조회 완료). 한국 휴장 또는 제공 지연일 수 있습니다. D1 추가 조회 없음.`;
+     else if(d?.latestMatchedDate)target.textContent=`뉴욕 지표 최신 확정일 ${d.latestMatchedDate} · Yahoo 일별 종가 기준`;
+     else target.textContent='뉴욕 지표 확인 중';
+   }
   }catch(e){
    console.warn('NYX New York close unavailable',e);
+   if($('nyxNyStatus'))$('nyxNyStatus').textContent='뉴욕 지표 조회 실패 · 다음 갱신 시 다시 확인합니다.';
    // Preserve the Seoul chart if the New York endpoint is unavailable.
   }
   const now=Date.now();
@@ -590,14 +601,40 @@ async function loadChart(force=false){
 document.querySelectorAll('[name=axisMode]').forEach(r=>{r.checked=r.value===axisMode;r.addEventListener('change',()=>{if(!r.checked)return;axisMode=r.value;try{localStorage.setItem('nyx-axis-mode',axisMode)}catch{}applyAxisMode()})});
 document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-r]').forEach(x=>x.classList.remove('active'));b.classList.add('active');range=b.dataset.r;loadChart()});
 $('refresh').onclick=()=>{update();loadChart(true)};
-$('copy').onclick=async()=>{if(!last)return;const t=`닉스 환율: ${f2(last.n)}
+// Reuse the daily-close series already loaded for the chart: copying never requests D1.
+function latestConfirmedCloseForCopy(){
+ const rows=dailyPointsCache||closeBaselineCache||[];
+ return rows.filter(r=>r && /^\d{4}-\d{2}-\d{2}$/.test(r.date) &&
+   Number.isFinite(r.n)&&r.n>0 && Number.isFinite(r.kr)&&r.kr>0 &&
+   Number.isFinite(r.sk)&&r.sk>0 && Number.isFinite(r.x)&&r.x>0)
+  .sort((a,b)=>a.date.localeCompare(b.date)).at(-1)||null;
+}
+function boardCopyText(){
+ if(!last)return '';
+ const current=`닉스 환율: ${f2(last.n)}
 한국 SK하이닉스: ${f0(last.k)}원 (${formatKstBasis(last.krTs)})
 SKHY: $${f2(last.u)} (${formatKstBasis(last.usTs)})
 USD/KRW: ${f2(last.x)} (${formatKstBasis(last.fxTs)})
-0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}catch{prompt('복사하세요',t)}};
+0.1 × ${f0(last.k)} ÷ ${f2(last.u)} = ${f2(last.n)}`;
+ const row=latestConfirmedCloseForCopy();
+ const close=row?`한국종가기준 (${row.date} 15:30)
+닉스 환율: ${f2(row.n)}
+한국 SK하이닉스: ${f0(row.kr)}원
+SKHY: $${f2(row.sk)} (한국장 15:30 기준)
+USD/KRW: ${f2(row.x)} (한국장 15:30 기준)
+0.1 × ${f0(row.kr)} ÷ ${f2(row.sk)} = ${f2(row.n)}`
+ : '한국종가기준\n확정 종가 데이터 미수신 (차트 갱신 후 다시 복사)';
+ return current+'\n-------------------------------------------------\n'+close;
+}
+$('copy').onclick=async()=>{
+ if(!last)return;
+ const t=boardCopyText();
+ try{await navigator.clipboard.writeText(t);$('copy').textContent='복사 완료';setTimeout(()=>$('copy').textContent='게시판용 문구 복사',1200)}
+ catch{prompt('복사하세요',t)}
+};
 
 
-// v1.04.30: Browser-side pattern diagnostics; AI only interprets verified features.
+// v1.04.31: Browser-side pattern diagnostics; AI only interprets verified features.
 let nyxAiBusy=false, aiPeriod='today';
 const aiResultCache=new Map();
 const aiPercent=n=>Number.isFinite(n)?`${n>0?'+':''}${n.toFixed(2)}%`:'—';
@@ -663,7 +700,7 @@ function aiPatternDiagnostics(commonRows){
   // Direction of NYK premium relative to the Korea-close observation, not a USD/KRW FX rate.
   mostRecentNewYorkBelowSeoul:latestSpreadPct<0};
 }
-// v1.04.30 - full five-indicator daily analysis using cached Seoul/New York observations.
+// v1.04.31 - full five-indicator daily analysis using cached Seoul/New York observations.
 // Values are transported as a bounded daily series, not interpreted as causal proof.
 function aiDailyEvidence(seoulRows,nyRows,period){
  const nyMap=new Map(nyRows.filter(r=>aiIsDate(r.date)&&r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
@@ -829,7 +866,7 @@ function aiPrepareComparison(seoulRows,nyRows,period){
   newyork:nyRows.filter(r=>r.date>=newyork.start&&r.date<=newyork.end)
  }};
 }
-// v1.04.30: Today's analysis must use the confirmed 15:30 KST D1 row, never the prior US close.
+// v1.04.31: Today's analysis must use the confirmed 15:30 KST D1 row, never the prior US close.
 function aiPrepareToday(rows){
  const valid=rows.filter(r=>aiIsDate(r.date)&&r.n>0&&r.x>0&&r.kr>0&&r.sk>0)
   .sort((a,b)=>a.date.localeCompare(b.date));
