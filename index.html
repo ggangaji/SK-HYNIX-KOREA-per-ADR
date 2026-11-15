@@ -116,8 +116,8 @@
  <div class="ai-period" style="align-items:center;gap:8px" aria-label="AI 모델 선택">
   <label for="nyxAiProvider" style="font-weight:750">AI 엔진</label>
   <select id="nyxAiProvider" aria-label="AI 분석 모델" style="background:#151d27;color:#f5f7fa;border:1px solid #304154;border-radius:10px;padding:8px;max-width:100%;font-size:13px">
-   <option value="gemini">Gemini 3.5 Flash-Lite · 무료</option>
-   <option value="exaone">K-EXAONE 2.5 · 기존</option>
+   <option value="gemini">Gemini 3.5 Flash-Lite</option>
+   <option value="exaone">K-EXAONE 2.5</option>
   </select>
  </div>
  <div class="ai-period" role="radiogroup" aria-label="AI 분석 기간">
@@ -657,6 +657,7 @@ const aiSpanDays=(a,b)=>Math.round((Date.parse(b+'T00:00:00+09:00')-Date.parse(a
 const aiPeriodNames={today:'당일','1w':'1주일','1mo':'1개월'};
 const aiPct=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&a>0&&b>0?100*(b/a-1):null;
 const aiIsDate=s=>typeof s==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(s);
+// v1.04.37: first selected day uses the immediately previous confirmed trading day as return baseline.
 // v1.04.35: one shared calendar/trading-date selector for chart, metrics, patterns and AI evidence.
 // Weekly = five most recent recorded Korean trading days (not six or seven).
 // Monthly = same 30-calendar-day date window used by the plotted chart.
@@ -699,19 +700,21 @@ function aiSvgSpark(values,change){
  path.setAttribute('stroke',aiColor(change));svg.append(path);return svg;
 }
 function aiStdev(a){if(a.length<3)return null;const avg=a.reduce((x,y)=>x+y,0)/a.length;return Math.sqrt(a.reduce((x,y)=>x+(y-avg)**2,0)/(a.length-1))}
-function aiPatternDiagnostics(commonRows){
+function aiPatternDiagnostics(commonRows,baselineRow=null){
  const rows=commonRows.filter(r=>Number.isFinite(r.n)&&r.n>0&&Number.isFinite(r.ny)&&r.ny>0)
   .sort((a,b)=>a.date.localeCompare(b.date));
  if(rows.length<2)return null;
+ // Reference observation is NOT a selected-period day; it is a denominator only.
+ const prior=baselineRow&&baselineRow.date<rows[0].date&&Number.isFinite(baselineRow.n)&&baselineRow.n>0&&Number.isFinite(baselineRow.ny)&&baselineRow.ny>0?baselineRow:null;
+ const timeline=prior?[prior,...rows]:rows;
  const changes=[];
- for(let i=1;i<rows.length;i++){
-  const a=aiPct(rows[i-1].n,rows[i].n),b=aiPct(rows[i-1].ny,rows[i].ny);
-  // The daily spread measures the relative change of two end-of-day benchmarks, not a causal effect.
-  changes.push({date:rows[i].date,seoul:a,newyork:b,returnGap:b-a,absGap:Math.abs(b-a)});
+ for(let i=1;i<timeline.length;i++){
+  const a=aiPct(timeline[i-1].n,timeline[i].n),b=aiPct(timeline[i-1].ny,timeline[i].ny);
+  changes.push({date:timeline[i].date,seoul:a,newyork:b,returnGap:b-a,absGap:Math.abs(b-a)});
  }
  const last=rows.at(-1),prev=rows.at(-2);
  const latestSpreadPct=aiPct(last.n,last.ny);
- const adrAfterKoreaPct=aiPct(last.ny,last.n); // NYX_SEOUL / NYX_NEWYORK - 1 = US close / US at Korean close - 1
+ const adrAfterKoreaPct=aiPct(last.ny,last.n);
  const beforeLast=rows.length>=3?{seoul:aiPct(rows[0].n,prev.n),newyork:aiPct(rows[0].ny,prev.ny)}:null;
  const paired=changes.filter(x=>Number.isFinite(x.seoul)&&Number.isFinite(x.newyork));
  const agreeing=paired.filter(x=>Math.sign(x.seoul)===Math.sign(x.newyork)).length;
@@ -719,14 +722,13 @@ function aiPatternDiagnostics(commonRows){
  const largest=[...paired].sort((a,b)=>b.absGap-a.absGap)[0];
  const latest=paired.at(-1);
  return {start:rows[0].date,end:last.date,count:rows.length,pairedDays:paired.length,
+  baselineDate:prior?.date??null,
   latestSpreadPct,adrAfterKoreaPct,
   lastDate:last.date,lastSeoulChange:latest?.seoul??null,lastNewYorkChange:latest?.newyork??null,
   priorTrend:beforeLast,
   largestDivergence:largest?{date:largest.date,seoul:largest.seoul,newyork:largest.newyork,differencePp:largest.returnGap}:null,
-  sameDirectionDays:agreeing,
-  directionSampleDays:paired.length,
+  sameDirectionDays:agreeing,directionSampleDays:paired.length,
   volatilitySeoul:volSeoul,volatilityNewYork:volNewYork,
-  // Direction of NYK premium relative to the Korea-close observation, not a USD/KRW FX rate.
   mostRecentNewYorkBelowSeoul:latestSpreadPct<0};
 }
 // v1.04.31 - full five-indicator daily analysis using cached Seoul/New York observations.
@@ -734,13 +736,15 @@ function aiPatternDiagnostics(commonRows){
 function aiDailyEvidence(seoulRows,nyRows,period,bounds){
  const nyMap=new Map(nyRows.filter(r=>aiIsDate(r.date)&&r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
  const seoul=seoulRows.filter(r=>aiIsDate(r.date)&&r.n>0&&r.x>0).sort((a,b)=>a.date.localeCompare(b.date));
- // For weekly/monthly the exact chart dates are the input sample; no independent lookback.
- const candidates=period==='today'?seoul.slice(-4):seoul.filter(r=>nyxInPeriod(r,bounds));
+ // Add the immediately preceding Korean trading day solely as a return denominator.
+ const selected=period==='today'?seoul.slice(-4):seoul.filter(r=>nyxInPeriod(r,bounds));
+ const prior=selected.length&&period!=='today'?seoul.filter(r=>r.date<selected[0].date).at(-1):null;
+ const candidates=prior?[prior,...selected]:selected;
  return candidates.map(r=>{
   const us=nyMap.get(r.date);
   const kr=r.kr>0?r.kr:(us?.kr>0?us.kr:null);
   const adrAtSeoul=r.sk>0?r.sk:(kr>0&&r.n>0?.1*kr/r.n:null);
-  return {d:r.date,s:Number(r.n.toFixed(3)),f:Number(r.x.toFixed(3)),
+  return {d:r.date,baseline:!!prior&&r.date===prior.date,s:Number(r.n.toFixed(3)),f:Number(r.x.toFixed(3)),
    k:kr>0?Number(kr.toFixed(2)):null,u:us?.us>0?Number(us.us.toFixed(3)):null,
    y:us?.ny>0?Number(us.ny.toFixed(3)):null,
    a:adrAtSeoul>0?Number(adrAtSeoul.toFixed(3)):null};
@@ -754,7 +758,8 @@ function aiDailyFindings(rows){
   for(const key of ['s','y','k','u','f'])ret[key]=aiPct(p[key],r[key]);
   ret.gap=(ret.s!==null&&ret.y!==null)?ret.y-ret.s:null;
   ret.usFromSeoul=(r.a>0&&r.u>0)?aiPct(r.a,r.u):null;
-  changes.push(ret);
+  // Do not assign an out-of-period reference observation to selected-period statistics.
+  if(!r.baseline)changes.push(ret);
  }
  const pair=changes.filter(r=>Number.isFinite(r.gap));
  const biggest=[...pair].sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap))[0]||null;
@@ -763,7 +768,7 @@ function aiDailyFindings(rows){
  const fxComparisons=changes.filter(r=>Number.isFinite(r.s)&&Number.isFinite(r.f));
  const fxSame=fxComparisons.filter(r=>Math.sign(r.s)===Math.sign(r.f)).length;
  // Treat short samples as descriptive only. No significance or prediction claims.
- return {n:ordered.length,changeCount:changes.length,
+ return {n:ordered.filter(r=>!r.baseline).length,changeCount:changes.length,
   largestGap:biggest?{date:biggest.d,spreadPp:biggest.gap,kr:biggest.k,us:biggest.u,fx:biggest.f,adrAfter:biggest.usFromSeoul}:null,
   largestStockDifference:biggestStock?{date:biggestStock.d,kr:biggestStock.k,us:biggestStock.u,differencePp:biggestStock.k-biggestStock.u}:null,
   fxDirection:{same:fxSame,total:fxComparisons.length},
@@ -877,11 +882,16 @@ function aiPrepareComparison(seoulRows,nyRows,period){
  const seoul=aiPeriodSeries(seoulDisplay,['n','x'],period,bounds);
  const newyork=aiPeriodSeries(newyorkDisplay,['kr','us','ny'],period,bounds);
  if(!seoul||!newyork)throw Error(`${aiPeriodNames[period]} 비교에 필요한 확정 데이터가 부족합니다.`);
- const nyMap=new Map(newyorkDisplay.filter(r=>r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
+ const nyMap=new Map(nyRows.filter(r=>r.kr>0&&r.us>0&&r.ny>0).map(r=>[r.date,r]));
  const common=seoulDisplay.filter(r=>r.n>0&&nyMap.has(r.date)).map(r=>({...r,ny:nyMap.get(r.date).ny}));
- // Pattern diagnostics and day-over-day evidence must NOT include earlier days.
- const pattern=aiPatternDiagnostics(common);
- const dailyEvidence=aiDailyEvidence(seoulDisplay,newyorkDisplay,period,bounds);
+ // Only the immediately preceding Korean trading session may supply a baseline.
+ const firstSelected=seoulDisplay[0]?.date;
+ const previousSeoul=seoulRows.filter(r=>aiIsDate(r.date)&&r.date<firstSelected&&r.n>0&&r.x>0).sort((a,b)=>a.date.localeCompare(b.date)).at(-1);
+ const previousNewYork=previousSeoul?nyMap.get(previousSeoul.date):null;
+ const previousCommon=previousSeoul&&previousNewYork?{...previousSeoul,ny:previousNewYork.ny}:null;
+ const pattern=aiPatternDiagnostics(common,previousCommon);
+ // Display dates remain unchanged; prior date is used only to calculate first selected-day returns.
+ const dailyEvidence=aiDailyEvidence(seoulRows,nyRows,period,bounds);
  const dailyFindings=aiDailyFindings(dailyEvidence);
  const both=common.length>=2?{start:common[0].date,end:common.at(-1).date,count:common.length,
   seoulFirst:common[0].n,seoulLast:common.at(-1).n,seoulChange:aiPct(common[0].n,common.at(-1).n),
