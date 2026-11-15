@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <link rel="icon" type="image/x-icon" href="icons/favicon.ico">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
-<title>닉스환율 지표추적자 v1.04.40</title>
+<title>닉스환율 지표추적자 v1.05.01</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#141a22;--card2:#10151c;--text:#f5f7fa;--muted:#95a1b2;--line:#26303d;--good:#35c98a;--bad:#ff6677;--accent:#6aa7ff}
@@ -83,10 +83,24 @@
 .ai-detail-toggle{display:block;margin-top:12px;color:var(--muted);font-size:11px;cursor:pointer}
 .ai-detail-toggle textarea{margin-top:8px;width:100%;resize:vertical;background:#10151c;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px}
 @media(max-width:390px){.ai-grid{gap:6px}.ai-metric{padding:11px 9px}.ai-metric small{font-size:10px}}
+
+/* v1.05.01: browser-only Weibull trend-survival research card */
+.nyx-wb{margin:13px 0 14px;border:1px solid #35516d;border-radius:15px;padding:15px;background:linear-gradient(155deg,#142238,#101722)}
+.nyx-wb-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
+.nyx-wb-version{font-size:10px;border:1px solid #39506d;border-radius:30px;padding:4px 7px;color:#a7c9f2}
+.nyx-wb-figures{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px}
+.nyx-wb-figures div{display:flex;flex-direction:column;gap:5px}
+.nyx-wb-figures small{font-size:11px;color:#9fb1c5}
+.nyx-wb-figures strong{font-size:clamp(14px,3.3vw,21px);letter-spacing:-.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
+#nyxWbGraph{width:100%;height:auto;display:block;margin:3px 0 5px;overflow:visible}
+.nyx-wb-detail{display:flex;flex-wrap:wrap;gap:6px;font-size:11px;color:#d4deeb}
+.nyx-wb-detail span{padding:6px 8px;border:1px solid #2f455c;border-radius:8px;background:#111c2b}
+.nyx-wb-note{font-size:11px;line-height:1.65;color:#a0b0c3;margin-top:9px}
+@media(max-width:400px){.nyx-wb-figures{grid-template-columns:1fr}}
 </style>
 </head>
 <body><main class="wrap">
-<div class="top"><img class="top-logo" src="data:image/png;base64,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" alt="SK 닉스환율 아이콘">닉스환율 지표추적자 v1.04.40 · SK hynix Korea / ADR</div>
+<div class="top"><img class="top-logo" src="data:image/png;base64,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" alt="SK 닉스환율 아이콘">닉스환율 지표추적자 v1.05.01 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -126,6 +140,16 @@
   <label><input type="radio" name="aiPeriod" value="1mo"> 1개월</label>
  </div>
  <div class="ai-period-note">AI는 아래 지표추적자 카드에 없는 추가 패턴만 해석합니다. 동일 데이터는 이전 AI 결과를 재사용합니다.</div>
+ <section id="nyxWeibullPanel" class="nyx-wb" aria-label="와이블 기반 다음 원달러 환율 예상 범위">
+  <div class="nyx-wb-head"><strong>자체 예측 · 다음 거래일 원/달러 예상 범위</strong><span class="nyx-wb-version">Weibull Lab v1</span></div>
+  <div id="nyxWbStatus" class="note">확정 일별 환율을 불러오는 중…</div>
+  <div id="nyxWbResult" style="display:none" aria-live="polite">
+   <div class="nyx-wb-figures"><div><small>예상 중심값</small><strong id="nyxWbCenter">—</strong></div><div><small>예상 범위 (실험적 10~90% 추정)</small><strong id="nyxWbRange">—</strong></div></div>
+   <svg id="nyxWbGraph" viewBox="0 0 580 138" role="img" aria-label="기준 환율과 예상 하단, 중심, 상단을 나타낸 범위 그래프"></svg>
+   <div class="nyx-wb-detail" id="nyxWbDetails"></div>
+  </div>
+  <div class="nyx-wb-note">와이블은 추세 지속기간의 종료 위험을 추정하고, 환율 예상 가격 범위는 과거 일별 변동률 분포를 이용합니다. 확률·범위는 실거래 검증 전의 실험값이며 보장된 예측 구간이 아닙니다.</div>
+ </section>
  <div class="actions ai-single-action"><button type="button" id="nyxGeminiForecast">Gemini · 다음 영업일 원/달러 한마디 전망</button></div>
  <div id="nyxFxForecast" class="ai-analysis-card" style="display:none" aria-live="polite"></div>
  <div class="note">전망은 Google Gemini가 최근 1개월의 확정 자료로 작성하며, 실제 환율 예측력이 검증된 것은 아닙니다. 뉴스·실시간 시장·향후 이벤트를 자동 확인하지 않습니다.</div>
@@ -554,7 +578,7 @@ async function loadDailyPoints(force=false){
     kr:Number(r.kr_price),sk:Number(r.skhy_price),krTs:Number(r.kr_timestamp),skTs:Number(r.skhy_timestamp),fxTs:Number(r.fx_timestamp),
     q:r.quality||'REFERENCE',date:r.date||key(Number(r.timestamp))
   })).filter(q=>Number.isFinite(q.t)&&q.n>0&&q.x>0).sort((a,b)=>a.t-b.t);
-  dailyPointsCache=p;dailyPointsCacheAt=Date.now();closeBaselineCache=p;closeBaselineAt=Date.now();return p;
+  dailyPointsCache=p;dailyPointsCacheAt=Date.now();closeBaselineCache=p;closeBaselineAt=Date.now();nyxWeibullRender();return p;
 }
 async function loadNyxNewYorkPoints(force=false){
  const now=Date.now();
@@ -778,7 +802,7 @@ function aiDailyFindings(rows){
   fxDirection:{same:fxSame,total:fxComparisons.length},
   dayRows:changes};
 }
-// v1.04.40: lagged returns, never an in-sample level correlation or a claim of causation.
+// v1.05.01: lagged returns, never an in-sample level correlation or a claim of causation.
 // N(t) is paired with FX(t+1) using consecutive recorded Korean market sessions.
 function aiFxLeadDiagnostics(evidence){
  const rows=[...evidence].filter(r=>aiIsDate(r.d)&&r.s>0&&r.f>0).sort((a,b)=>a.d.localeCompare(b.d));
@@ -813,7 +837,7 @@ function aiFxLeadDiagnostics(evidence){
   lastNReturn:active.at(-1)?.n??null,lastFxReturn:active.at(-1)?.fx??null,
   sufficient:pairs.length>=8,note:'1거래일 선행: N(t) vs FX(t+1). 수익률 사용, 날짜 정렬. 추세 상관과 인과 증거 아님'};
 }
-// v1.04.40: same-time Korean 15:30 equity/ADR drivers of implied FX.
+// v1.05.01: same-time Korean 15:30 equity/ADR drivers of implied FX.
 // Only independently recorded and formula-consistent Korean 15:30 stock/ADR quotes qualify.
 // A preceding trading day may be used as a denominator, never as an in-period observation.
 function aiStockNixDrivers(evidence){
@@ -911,7 +935,7 @@ function aiRenderMetrics(m){
    addItem('선택 기간의 닉스환율 · 원/달러',`${relationship} 움직임`,
     `닉스환율 ${aiPercent(m.seoul.n.change)} · 원/달러 ${aiPercent(m.seoul.x.change)} · 등락률 차이 ${Math.abs(r).toFixed(2)}%p`);
   }
-  // v1.04.40: clearly separate same-day co-movement from one-session lead.
+  // v1.05.01: clearly separate same-day co-movement from one-session lead.
   if(m.fxLead){
    const l=m.fxLead,coef=v=>Number.isFinite(v)?v.toFixed(2):'표본 부족';
    addItem('원·달러 환율 선행성 · 1거래일',`${l.pairs}쌍 중 ${l.leadDirectionMatches}쌍 방향 일치`,
@@ -925,7 +949,7 @@ function aiRenderMetrics(m){
    addItem('양국 주가 등락률 차이가 가장 컸던 날',t.date,
     `한국 SK하이닉스 ${aiPercent(t.kr)} · 미국 SKHY ${aiPercent(t.us)} · 차이 ${Math.abs(t.differencePp).toFixed(2)}%p`);
   }
-  // v1.04.40: direct, time-aligned components of the displayed NYX rate.
+  // v1.05.01: direct, time-aligned components of the displayed NYX rate.
   const drivers=m.stockDrivers;
   if(drivers?.count){
    addItem('한국 SK하이닉스 · 닉스환율 방향',`${drivers.count}번 중 ${drivers.krSame}번 동행`,
@@ -1099,6 +1123,148 @@ function formatExaone429(d){
  if(!d.providerCode&&!d.providerDescription)items.push('API에서 구체적인 거절 사유를 제공하지 않았습니다');
  return items.length?' · '+items.join(' · '):' · 제한 상세정보 미제공';
 }
+
+// v1.05.01 -- deterministic browser-side research forecast. No Worker/API/D1 mutation.
+// Data cutoff: last confirmed Korean 15:30 observation. No lookahead or calendar extrapolation.
+const NYX_WB_WINDOW=150;
+const nyxWbRound=x=>Number.isFinite(x)?x.toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+function nyxWbQuantile(sorted,p){
+ if(!sorted.length)return null;
+ const j=(sorted.length-1)*p,a=Math.floor(j),b=Math.ceil(j);
+ return sorted[a]+(sorted[b]-sorted[a])*(j-a);
+}
+function nyxWbRuns(returns){
+ // A run is consecutive non-zero daily FX return signs; first run left-censored and
+ // current run right-censored. Only complete internal runs are fitting events.
+ const segments=[];let current=null;
+ for(const r of returns){
+  const sign=Math.sign(r.delta);
+  if(sign===0){if(current){segments.push(current);current=null;}continue;}
+  if(!current||current.sign!==sign){if(current)segments.push(current);current={sign,len:1};}
+  else current.len++;
+ }
+ if(current)segments.push(current);
+ return {completed:segments.slice(1,-1).map(r=>r.len),
+  current:segments.at(-1)||null,completeCount:Math.max(0,segments.length-2)};
+}
+function nyxWeibullFit(runs){
+ // Continuous Weibull approximation to completed discrete run lengths. Last run is
+ // right-censored; first is excluded as potentially left-censored.
+ const completed=runs.completed,ongoing=runs.current?.len||0;
+ if(completed.length<10)return null;
+ const all=completed.concat(ongoing>0?[ongoing]:[]),m=completed.length;
+ let best=null;
+ for(let k=0.45;k<=3.50;k+=0.025){
+  const denom=all.reduce((t,d)=>t+Math.pow(d,k),0);
+  const lambda=Math.pow(denom/m,1/k);
+  if(!(lambda>0))continue;
+  // continuous event likelihood; right censored run contributes only survival term
+  const ll=m*Math.log(k)-m*k*Math.log(lambda)+(k-1)*completed.reduce((t,d)=>t+Math.log(d),0)-denom/Math.pow(lambda,k);
+  if(!best||ll>best.ll)best={k,lambda,ll};
+ }
+ if(!best)return null;
+ const t=ongoing>0?ongoing:0;
+ const hazard=1-Math.exp(-(Math.pow((t+1)/best.lambda,best.k)-Math.pow(t/best.lambda,best.k)));
+ return {...best,reversal:Math.min(.99,Math.max(.01,hazard))};
+}
+function nyxWeibullPrediction(inputRows){
+ const byDate=new Map();
+ for(const r of inputRows||[]){
+  const date=r.date,fx=Number(r.x),nyx=Number(r.n);
+  if(aiIsDate(date)&&Number.isFinite(fx)&&fx>0&&Number.isFinite(nyx)&&nyx>0){
+   // Overwrite duplicate dates only with strictly later timestamps
+   const old=byDate.get(date);if(!old||Number(r.t)>=Number(old.t))byDate.set(date,{date,fx,nyx,t:r.t});
+  }
+ }
+ const all=[...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
+ // Include one extra baseline for N returns.
+ const rows=all.slice(-(NYX_WB_WINDOW+2));
+ const ret=[];
+ for(let i=1;i<rows.length;i++){
+  const prev=rows[i-1],curr=rows[i];
+  const fx=Math.log(curr.fx/prev.fx),n=Math.log(curr.nyx/prev.nyx);
+  if(Number.isFinite(fx)&&Number.isFinite(n)&&Math.abs(fx)<.12&&Math.abs(n)<.5)
+    ret.push({date:curr.date,fx,n,delta:fx});
+ }
+ // Do not fabricate a price range when there are too few independent returns.
+ if(ret.length<25)return {ready:false,why:`일별 환율 변동 ${ret.length}개 · 범위 추정은 최소 25개 필요`};
+ const last=rows.at(-1),recent=ret.slice(-120);
+ const logFx=recent.map(x=>x.fx).sort((a,b)=>a-b);
+ const q10=nyxWbQuantile(logFx,.1),q90=nyxWbQuantile(logFx,.9);
+ // A regularized directional signal: last NYX movement versus FX next-session changes.
+ // Very short samples or correlation instability shrink toward zero.
+ const lagPairs=[];
+ for(let i=0;i<recent.length-1;i++)lagPairs.push({x:recent[i].n,y:recent[i+1].fx});
+ const avg=(a,k)=>a.reduce((v,r)=>v+r[k],0)/a.length;
+ let signal=0,leadR=null;
+ if(lagPairs.length>=40){
+  const x0=avg(lagPairs,'x'),y0=avg(lagPairs,'y');
+  const cov=lagPairs.reduce((v,r)=>v+(r.x-x0)*(r.y-y0),0),vx=lagPairs.reduce((v,r)=>v+(r.x-x0)**2,0),vy=lagPairs.reduce((v,r)=>v+(r.y-y0)**2,0);
+  if(vx>1e-12&&vy>1e-12){
+   leadR=cov/Math.sqrt(vx*vy);
+   const slope=Math.max(-2,Math.min(2,cov/vx));
+   // cap impact to avoid overfitting; 30% raw slope and no more than 0.2 historical daily 80% width
+   signal=Math.max(-.2*(q90-q10),Math.min(.2*(q90-q10),.3*slope*(recent.at(-1).n-x0)));
+  }
+ }
+ // Use trend survival as a modest sign-dependent directional adjustment, not an FX price distribution.
+ const runs=nyxWbRuns(recent),fit=nyxWeibullFit(runs),lastSign=Math.sign(recent.at(-1).fx);
+ const recentMean=recent.slice(-10).reduce((a,r)=>a+r.fx,0)/Math.min(10,recent.length);
+ const continuation=fit?1-fit.reversal:null;
+ const trendBias=fit&&lastSign!==0?lastSign*(2*continuation-1)*Math.min(Math.abs(recentMean)*.35,(q90-q10)*.075):0;
+ const shift=signal+trendBias;
+ // Historical log-return quantiles shifted by a strictly bounded directional adjustment.
+ const lower=last.fx*Math.exp(q10+shift),upper=last.fx*Math.exp(q90+shift);
+ const center=last.fx*Math.exp(shift);
+ return {ready:true,last,center,lower,upper,baseline:last.fx,
+  dates:rows[0].date+' ~ '+last.date,observations:recent.length,
+  samples:lagPairs.length,leadR,fit,runs,shift,
+  pointDirection:center>last.fx?'상승':center<last.fx?'하락':'보합'};
+}
+function nyxWbSvgLabel(svg,x,y,text,fill='#a8bbcf',anchor='middle',size=12){
+ const e=document.createElementNS('http://www.w3.org/2000/svg','text');
+ e.setAttribute('x',x);e.setAttribute('y',y);e.setAttribute('fill',fill);e.setAttribute('text-anchor',anchor);
+ e.setAttribute('font-size',size);e.setAttribute('font-family','system-ui, sans-serif');e.textContent=text;svg.append(e);
+}
+function nyxWbSvgRect(svg,x,y,w,h,fill,r=0){const e=document.createElementNS('http://www.w3.org/2000/svg','rect');
+ for(const [k,v] of Object.entries({x,y,width:w,height:h,fill,rx:r}))e.setAttribute(k,v);svg.append(e);}
+function nyxWbSvgLine(svg,x,y,w,h,stroke,dash=''){
+ const e=document.createElementNS('http://www.w3.org/2000/svg','line');
+ for(const [k,v] of Object.entries({x1:x,y1:y,x2:w,y2:h,stroke,'stroke-width':2}))e.setAttribute(k,v);
+ if(dash)e.setAttribute('stroke-dasharray',dash);svg.append(e);
+}
+function nyxWeibullRender(){
+ const status=$('nyxWbStatus'),result=$('nyxWbResult');
+ if(!status||!result)return;
+ const model=nyxWeibullPrediction(dailyPointsCache);
+ if(!model.ready){status.textContent=model.why;result.style.display='none';return;}
+ status.textContent=`기준 ${model.last.date} 한국장 15:30 · 최근 ${model.observations}개 일별 변동 · 추가 API 호출 없음`;
+ result.style.display='block';
+ $('nyxWbCenter').textContent=nyxWbRound(model.center)+'원';
+ $('nyxWbRange').textContent=nyxWbRound(model.lower)+' ~ '+nyxWbRound(model.upper)+'원';
+ const details=$('nyxWbDetails');details.replaceChildren();
+ const add=t=>{const span=document.createElement('span');span.textContent=t;details.append(span)};
+ add('현재 기준 '+nyxWbRound(model.baseline)+'원');
+ add('방향 편향 '+model.pointDirection+' · '+(model.shift*100).toFixed(3)+'%');
+ if(model.fit){add('와이블 추세 종료위험 '+(model.fit.reversal*100).toFixed(1)+'% (다음 1일)');
+  add('현재 '+(model.runs.current?.sign>0?'상승':'하락')+' 추세 '+(model.runs.current?.len||0)+'일 · 완료 '+model.fit.k.toFixed(2)+' 형상 k');
+ }else add('와이블 추정 대기 · 완결 추세 '+model.runs.completed.length+'/10건');
+ add('선행성 '+(model.leadR===null?'자료 부족':model.leadR.toFixed(2))+' (참고)');
+ const svg=$('nyxWbGraph');svg.replaceChildren();
+ const min=Math.min(model.lower,model.baseline,model.center),max=Math.max(model.upper,model.baseline,model.center);
+ const margin=Math.max(1,(max-min)*.12),lo=min-margin,hi=max+margin;
+ const pos=v=>45+490*(v-lo)/(hi-lo),pxLow=pos(model.lower),pxHigh=pos(model.upper),pxBase=pos(model.baseline),pxCenter=pos(model.center);
+ nyxWbSvgLine(svg,45,110,535,110,'#3f5670');
+ nyxWbSvgRect(svg,pxLow,50,Math.max(3,pxHigh-pxLow),24,'#255b87',8);
+ nyxWbSvgLine(svg,pxBase,33,pxBase,111,'#a4b4c9','5 4');
+ nyxWbSvgLine(svg,pxCenter,40,pxCenter,90,'#f3c67b');
+ nyxWbSvgLabel(svg,pxLow,42,'하단','#b6d8f6');nyxWbSvgLabel(svg,pxHigh,42,'상단','#b6d8f6');
+ nyxWbSvgLabel(svg,pxBase,126,'기준','#a4b4c9');
+ nyxWbSvgLabel(svg,pxCenter,23,'중심 '+nyxWbRound(model.center),'#f3c67b');
+ nyxWbSvgLabel(svg,45,126,nyxWbRound(lo),'#93a7bc','start',10);
+ nyxWbSvgLabel(svg,535,126,nyxWbRound(hi),'#93a7bc','end',10);
+}
+
 async function aiRun(force=false,forecast=false){
  const period=forecast?'1mo':aiPeriod,provider=forecast?'gemini':nyxAiProviderEl.value,providerName=provider==='gemini'?'Gemini':'EXAONE';
  // Only one outstanding AI request per page. No automatic retries.
@@ -1217,6 +1383,7 @@ function nyxShowFxForecast(answer,m){
 }
 $('nyxAiAnalyze').addEventListener('click',()=>aiRun(false));
 $('nyxGeminiForecast').addEventListener('click',()=>aiRun(false,true));
+if(dailyPointsCache?.length)nyxWeibullRender();
 // One-shot EXAONE diagnostic: no automatic retries, no user market data sent.
 $('nyxAiDiagnose').addEventListener('click',async()=>{
  if(nyxAiBusy)return;
