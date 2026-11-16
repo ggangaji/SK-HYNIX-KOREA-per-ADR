@@ -84,23 +84,23 @@
 .ai-detail-toggle textarea{margin-top:8px;width:100%;resize:vertical;background:#10151c;color:var(--text);border:1px solid var(--line);border-radius:11px;padding:11px;font:inherit;font-size:13px}
 @media(max-width:390px){.ai-grid{gap:6px}.ai-metric{padding:11px 9px}.ai-metric small{font-size:10px}}
 
-/* v1.05.05: browser-only NYX lead-time probability timeline */
+/* v1.05.06: browser-only NYX lead-time probability timeline */
 .nyx-wb{margin:13px 0 14px;border:1px solid #35516d;border-radius:15px;padding:15px;background:linear-gradient(155deg,#142238,#101722)}
 .nyx-wb-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;font-size:13px}
 .nyx-wb-version{font-size:10px;border:1px solid #39506d;border-radius:30px;padding:4px 7px;color:#a7c9f2}
-.nyx-wb-figures{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0 6px}
+.nyx-wb-figures{display:grid;grid-template-columns:1.1fr 1.1fr .65fr;gap:10px;margin:14px 0 6px}
 .nyx-wb-figures div{display:flex;flex-direction:column;gap:5px}
 .nyx-wb-figures small{font-size:11px;color:#9fb1c5}
 .nyx-wb-figures strong{font-size:clamp(14px,3.3vw,21px);letter-spacing:-.02em;white-space:nowrap;font-variant-numeric:tabular-nums}
 #nyxWbGraph{width:100%;height:auto;display:block;margin:3px 0 5px;overflow:visible}
 .nyx-wb-detail{display:flex;flex-wrap:wrap;gap:6px;font-size:11px;color:#d4deeb}
-.nyx-wb-detail span{padding:6px 8px;border:1px solid #2f455c;border-radius:8px;background:#111c2b}
+.nyx-wb-detail span{padding:4px 0;color:#adbed2}.nyx-wb-detail span+span:before{content:" · ";color:#667e98}
 .nyx-wb-note{font-size:11px;line-height:1.65;color:#a0b0c3;margin-top:9px}
-@media(max-width:400px){.nyx-wb-figures{grid-template-columns:1fr}}
+@media(max-width:450px){.nyx-wb-figures{grid-template-columns:1fr 1fr}.nyx-wb-figures div:last-child{grid-column:1 / -1}}
 </style>
 </head>
 <body><main class="wrap">
-<div class="top"><img class="top-logo" src="data:image/png;base64,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" alt="SK 닉스환율 아이콘">닉스환율 지표추적자 v1.05.05 · SK hynix Korea / ADR</div>
+<div class="top"><img class="top-logo" src="data:image/png;base64,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" alt="SK 닉스환율 아이콘">닉스환율 지표추적자 v1.05.06 · SK hynix Korea / ADR</div>
 
 <section class="card">
 <div class="eyebrow">닉스 환율</div><div class="big" id="result">--</div><div class="unit">KRW / USD (implied)</div>
@@ -141,14 +141,14 @@
  </div>
  <div class="ai-period-note">AI는 아래 지표추적자 카드에 없는 추가 패턴만 해석합니다. 동일 데이터는 이전 AI 결과를 재사용합니다.</div>
  <section id="nyxWeibullPanel" class="nyx-wb" aria-label="NYX Prediction 선행 신호 예상 반영 타임라인">
-  <div class="nyx-wb-head"><strong>NYX Prediction · 선행 신호 추적</strong><span class="nyx-wb-version">실험적 분석</span></div>
+  <div class="nyx-wb-head"><strong>NYX Prediction</strong><span class="nyx-wb-version">실험적 전망</span></div>
   <div id="nyxWbStatus" class="note">확정된 닉스환율과 원·달러 자료를 불러오는 중…</div>
   <div id="nyxWbResult" style="display:none" aria-live="polite">
-   <div class="nyx-wb-figures"><div><small>가장 최근 신호</small><strong id="nyxWbCenter">—</strong></div><div><small>예상 반영 시점</small><strong id="nyxWbRange">—</strong></div></div>
-   <svg id="nyxWbGraph" viewBox="0 0 580 156" role="img" aria-label="신호 발생일부터 5거래일까지 최초 환율 반영 확률을 타원형 농도로 표현하는 타임라인"></svg>
+   <div class="nyx-wb-figures"><div><small>최근 닉스환율</small><strong id="nyxWbCenter">—</strong></div><div><small>예상 집중 구간</small><strong id="nyxWbRange">—</strong></div><div><small>추적 신호</small><strong id="nyxWbCount">—</strong></div></div>
+   <svg id="nyxWbGraph" viewBox="0 0 760 176" role="img" aria-label="최근 닉스환율 신호들의 예상 반영 시차를 실제 거래일에 맞춰 하나의 타임라인 위 타원형으로 겹쳐 보여줍니다"></svg>
    <div class="nyx-wb-detail" id="nyxWbDetails"></div>
   </div>
-  <div class="nyx-wb-note">닉스환율이 원·달러에 선행한다는 가정을 시험합니다. 타원 영역의 농도는 <b>해당 날짜에 처음 반영될 상대적 가능성</b>을 뜻하며, 정확한 예측력은 아직 검증되지 않았습니다. 유의한 표본이 없을 때는 확률을 표시하지 않습니다. 추가 D1 쓰기는 없습니다.</div>
+  <div class="nyx-wb-note">닉스환율 선행 가설에 따른 실험적 전망입니다. 타원의 농도는 시점별 상대적인 반영 가능성을 나타내며 예측 적중률은 검증 중입니다.</div>
  </section>
  <div class="actions ai-single-action"><button type="button" id="nyxGeminiForecast">Gemini · 다음 영업일 원/달러 한마디 전망</button></div>
  <div id="nyxFxForecast" class="ai-analysis-card" style="display:none" aria-live="polite"></div>
@@ -1147,7 +1147,7 @@ function formatExaone429(d){
 }
 
 // v1.05.01 -- deterministic browser-side research forecast. No Worker/API/D1 mutation.
-// NYX Prediction v1.05.05: use only already-confirmed daily points; no D1 writes.
+// NYX Prediction v1.05.06: use only already-confirmed daily points; no D1 writes.
 // Hypothesis: sufficiently large NYX daily changes can precede FX moves in the
 // same direction. This is NOT a causal claim. Date is a common daily observation
 // label; NYX quote timing must be scrutinized before claiming real-time foresight.
@@ -1201,19 +1201,17 @@ function nyxLeadWeibullFit(events){
 }
 function nyxWeibullPrediction(inputRows){
  const rows=nyxWbRows(inputRows);
- if(rows.length<22)return {ready:false,why:`공통 일별 관측 ${rows.length}개 · 신호 학습 자료 부족`};
+ if(rows.length<9)return {ready:false,why:`일별 확정 자료 ${rows.length}개 · 분석 데이터 부족`};
  const absNyx=rows.slice(1).map(x=>Math.abs(x.nr)).filter(Number.isFinite).sort((a,b)=>a-b);
  const absFx=rows.slice(1).map(x=>Math.abs(x.fr)).filter(Number.isFinite).sort((a,b)=>a-b);
- // Pre-specified robust rules; use stable nonzero movement thresholds.
  const nyxThreshold=Math.max(.0035,nyxWbQuantile(absNyx,.65));
  const fxThreshold=Math.max(.001,nyxWbQuantile(absFx,.50)*.80);
  const events=[];
+ // Keep *every* daily observation: overlapping five-day windows are allowed,
+ // but overlap cannot be treated as independent evidence of forecast skill.
  for(let i=1;i<rows.length;i++){
   const r=rows[i],sign=Math.sign(r.nr);
-  if(Math.abs(r.nr)<nyxThreshold||!sign)continue;
-  // Prevent overlapping training cases: a new event starts after the prior
-  // event's full five-day horizon; do not repeatedly count one FX move.
-  if(events.length&&i-events.at(-1).index<=NYX_LEAD_MAX)continue;
+  if(!sign)continue;
   const available=Math.min(NYX_LEAD_MAX,rows.length-i-1);
   let hit=0;
   for(let d=1;d<=available;d++){
@@ -1221,27 +1219,28 @@ function nyxWeibullPrediction(inputRows){
    if(fxMove>=fxThreshold){hit=d;break;}
   }
   const age=rows.length-i-1;
-  events.push({index:i,date:r.date,sign,nyxRate:r.nr,hit,
-   age,settled:hit>0||age>=NYX_LEAD_MAX,
-   // Recent 60-trading-day half-life without discarding earlier signals.
+  events.push({index:i,date:r.date,sign,nyxRate:r.nr,hit,age,
+   strong:Math.abs(r.nr)>=nyxThreshold,
+   settled:hit>0||age>=NYX_LEAD_MAX,
    weight:Math.pow(.5,age/60)});
  }
  const settled=events.filter(e=>e.settled);
  const weighted=settled.reduce((v,e)=>v+e.weight,0);
  const hitMass=settled.reduce((v,e)=>v+(e.hit?e.weight:0),0);
  const successes=settled.filter(e=>e.hit);
- const active=events.length?events.at(-1):null;
- const canEstimate=settled.length>=NYX_LEAD_MIN_EVENTS&&successes.length>=5&&weighted>0;
- const fit=canEstimate?nyxLeadWeibullFit(settled):null;
- // Mild Beta(1,1) regularization; do not claim calibration without backtesting.
+ // Exposure-adjusted sample size reports dependency conservatively (~5-day blocks).
+ const independentBlocks=Math.floor(settled.length/NYX_LEAD_MAX);
+ const fit=settled.length>=10&&successes.length>=5?nyxLeadWeibullFit(settled):null;
  const p5=fit?(hitMass+1)/(weighted+2):null;
- const probabilities=fit?fit.dist.map(p=>p*p5):null;
- const peak=probabilities?probabilities.indexOf(Math.max(...probabilities))+1:null;
- // With sparse data, show only a pale descriptive historical shape—not a forecast.
  const descriptive=successes.length>=2?Array.from({length:5},(_,i)=>successes.filter(e=>e.hit===i+1).reduce((v,e)=>v+e.weight,0)):null;
- return {ready:true,rows,events,settled,active,canEstimate:!!fit,probabilities,p5,peak,descriptive,
-  nyxThreshold,fxThreshold,fit,settledCount:settled.length,successCount:successes.length,
-  last:rows.at(-1)};
+ const sumDescriptive=descriptive?.reduce((a,b)=>a+b,0)||0;
+ const probabilities=fit?fit.dist.map(p=>p*p5):descriptive&&sumDescriptive?descriptive.map(p=>p/sumDescriptive):null;
+ const peak=probabilities?probabilities.indexOf(Math.max(...probabilities))+1:null;
+ const last=rows.at(-1);
+ const recent=events.filter(e=>e.index>=rows.length-5).slice(-5);
+ return {ready:true,rows,events,settled,active:events.at(-1),recent,canEstimate:!!fit,
+  probabilities,p5,peak,descriptive,independentBlocks,nyxThreshold,fxThreshold,fit,
+  settledCount:settled.length,successCount:successes.length,last};
 }
 function nyxWbSvgLabel(svg,x,y,text,fill='#a8bbcf',anchor='middle',size=12){
  const e=document.createElementNS('http://www.w3.org/2000/svg','text');
@@ -1253,71 +1252,109 @@ function nyxWbSvg(svg,tag,attrs){
  for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);
  svg.append(e);return e;
 }
+function nyxWbFutureDate(date){
+ // Provisional weekday labels only; no external exchange-holiday calendar.
+ const dt=new Date(date+'T12:00:00Z');
+ if(!Number.isFinite(dt.getTime()))return date;
+ do{dt.setUTCDate(dt.getUTCDate()+1)}while(dt.getUTCDay()===0||dt.getUTCDay()===6);
+ return dt.toISOString().slice(0,10);
+}
+function nyxWbDateAxis(model){
+ const rowDates=model.rows.slice(-5).map(x=>x.date);
+ const dates=[...rowDates];
+ for(let i=0;i<NYX_LEAD_MAX;i++)dates.push(nyxWbFutureDate(dates.at(-1)));
+ return {dates,today:rowDates.length-1};
+}
 function nyxWbProbabilityGraph(svg,model){
  svg.replaceChildren();
- const x=d=>40+d*99;
+ const {dates,today}=nyxWbDateAxis(model),start=36,end=724;
+ const x=i=>start+(end-start)*i/(dates.length-1);
+ const colors={up:'#e7a65c',down:'#58b7ec'};
  const defs=nyxWbSvg(svg,'defs',{});
- const grad=document.createElementNS('http://www.w3.org/2000/svg','radialGradient');
- grad.setAttribute('id','nyxLeadGlow');grad.setAttribute('cx','50%');grad.setAttribute('cy','50%');grad.setAttribute('rx','50%');grad.setAttribute('ry','50%');
- for(const [offset,opacity] of [['0%','0.72'],['38%','0.42'],['76%','0.14'],['100%','0']]){
-  const stop=document.createElementNS('http://www.w3.org/2000/svg','stop');
-  stop.setAttribute('offset',offset);stop.setAttribute('stop-color','#5bb5fa');stop.setAttribute('stop-opacity',opacity);grad.append(stop);
- }
- defs.append(grad);
- nyxWbSvg(svg,'line',{x1:40,y1:90,x2:535,y2:90,stroke:'#546980','stroke-width':2});
- for(let d=0;d<=5;d++){
-  const px=x(d);
-  nyxWbSvg(svg,'circle',{cx:px,cy:90,r:d===0?7:4,fill:d===0?'#f3c67b':'#8fa9c4'});
-  nyxWbSvgLabel(svg,px,116,d===0?'신호':`D+${d}`,'#a8bbcf','middle',12);
- }
- nyxWbSvg(svg,'path',{d:`M40 80 L40 58`,stroke:'#f3c67b','stroke-width':2});
- nyxWbSvgLabel(svg,40,47,'NYX','#f3c67b','middle',11);
- if(model.canEstimate||model.descriptive){
-  const probs=model.canEstimate?model.probabilities:model.descriptive;
-  const maxP=Math.max(...probs,1e-8);
-  for(let d=1;d<=5;d++){
-   const p=probs[d-1];
-   // Ellipse size and saturation derive from the *relative* probability, not
-   // a fabricated normal distribution over the timeline.
-   const rel=p/maxP,rx=30+13*rel,ry=12+21*rel;
-   const ell=nyxWbSvg(svg,'ellipse',{cx:x(d),cy:78,rx,ry,fill:'url(#nyxLeadGlow)',opacity:((model.canEstimate?.17:.05)+(model.canEstimate?.83:.28)*rel).toFixed(3)});
-   const ti=document.createElementNS('http://www.w3.org/2000/svg','title');
-   ti.textContent=model.canEstimate?`D+${d}일 최초 반영 추정 ${(p*100).toFixed(1)}%`:`D+${d}일 과거 반영 사례의 상대 빈도 (표본 부족)`;
-   ell.append(ti);
+ for(const [dir,color] of Object.entries(colors)){
+  const gradient=document.createElementNS('http://www.w3.org/2000/svg','radialGradient');
+  gradient.setAttribute('id','nyxWb'+dir);gradient.setAttribute('cx','50%');gradient.setAttribute('cy','50%');gradient.setAttribute('r','50%');
+  for(const [offset,opacity] of [['0%','0.88'],['45%','0.5'],['80%','0.13'],['100%','0']]){
+   const stop=document.createElementNS('http://www.w3.org/2000/svg','stop');
+   stop.setAttribute('offset',offset);stop.setAttribute('stop-color',color);stop.setAttribute('stop-opacity',opacity);gradient.append(stop);
   }
-  if(model.canEstimate){
-   nyxWbSvg(svg,'path',{d:`M${x(model.peak)} 31 l0 13`,stroke:'#7ec8ff','stroke-width':1.6,'stroke-dasharray':'3 3'});
-   nyxWbSvgLabel(svg,x(model.peak),22,`중심 D+${model.peak}`,'#9fd7ff','middle',13);
-  }else nyxWbSvgLabel(svg,285,22,'과거 반영 관측 · 표본 부족','#9fd7ff','middle',13);
-  nyxWbSvgLabel(svg,285,149,model.canEstimate?'타원의 농도 · 해당 거래일 최초 반영 상대 가능성':'타원의 농도 · 관측 사례 분포 (예측 확률 아님)','#8da7c2','middle',11);
- }else{
-  nyxWbSvgLabel(svg,295,67,'예측 분포 학습 중','#a9bdd2','middle',15);
-  nyxWbSvgLabel(svg,295,149,'충분한 과거 신호가 모이면 예상 반영 구간을 표시합니다','#8da7c2','middle',11);
+  defs.append(gradient);
  }
+ const timelineY=98;
+ nyxWbSvg(svg,'line',{x1:start,y1:timelineY,x2:end,y2:timelineY,stroke:'#617994','stroke-width':1.7});
+ nyxWbSvg(svg,'line',{x1:x(today),y1:19,x2:x(today),y2:112,stroke:'#d6e7f8','stroke-width':1.1,'stroke-dasharray':'4 5',opacity:.8});
+ // One shared calendar axis: historical signal x plus predicted lags in calendar space.
+ const rawProbs=model.probabilities;
+ const maxP=rawProbs?Math.max(...rawProbs,1e-9):1;
+ const score=Array(dates.length).fill(0);
+ const moving=model.recent.filter(e=>e.age<NYX_LEAD_MAX&&!e.hit);
+ for(const e of moving){
+  const idx=dates.indexOf(e.date);
+  if(idx<0)continue;
+  const up=e.sign>0;
+  const color=up?'up':'down';
+  const opacity=(.4+.6*(1-e.age/Math.max(1,NYX_LEAD_MAX)))*(e.strong?1:.65);
+  if(!rawProbs)continue;
+  const futureWeight=rawProbs.slice(e.age).reduce((a,b)=>a+b,0)||1;
+  for(let d=1;d<=5;d++){
+   const j=idx+d;
+   if(j>=dates.length||j<=today)continue; // Future distribution only; observed dates not forecast again.
+   const rel=rawProbs[d-1]/maxP;
+   // Four gradients overlap naturally without implying independent probability addition.
+   const ry=13+22*Math.sqrt(rel),rx=22+9*rel;
+   const ellipse=nyxWbSvg(svg,'ellipse',{cx:x(j),cy:timelineY-10,rx,ry,
+    fill:`url(#nyxWb${color})`,opacity:(opacity*(.18+.72*rel)).toFixed(3)});
+   const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+   title.textContent=`${e.date} 닉스환율 ${up?'상승':'하락'} 신호 · ${dates[j]} 반영 시점 (D+${d}, 실험적)`;
+   ellipse.append(title);
+   score[j]+=(rawProbs[d-1]/futureWeight)*opacity*(up?1:-1);
+  }
+  nyxWbSvg(svg,'circle',{cx:x(idx),cy:timelineY,r:e.index===model.rows.length-1?6:4,
+   fill:up?colors.up:colors.down,stroke:'#162031','stroke-width':1.5});
+ }
+ for(let j=0;j<dates.length;j++){
+  const px=x(j);
+  nyxWbSvg(svg,'line',{x1:px,y1:timelineY+4,x2:px,y2:timelineY+10,stroke:'#8fa8bf','stroke-width':1});
+  nyxWbSvgLabel(svg,px,129,dates[j].slice(5).replace('-','/'),j===today?'#f3d493':'#afc1d5','middle',j===today?13:11);
+ }
+ nyxWbSvgLabel(svg,x(today),13,'최근 확정일','#f0d6a1','middle',12);
+ let maxIndex=-1,maxScore=0;
+ for(let j=today+1;j<score.length;j++){
+  if(Math.abs(score[j])>maxScore){maxScore=Math.abs(score[j]);maxIndex=j;}
+ }
+ if(maxIndex>=0){
+  const center=x(maxIndex);
+  nyxWbSvg(svg,'line',{x1:center,y1:45,x2:center,y2:61,stroke:'#a3d4ff','stroke-dasharray':'3 4','stroke-width':1.2});
+  nyxWbSvgLabel(svg,center,34,'반영 집중','#c3e2fa','middle',12);
+ }
+ nyxWbSvg(svg,'circle',{cx:38,cy:154,r:5,fill:colors.up});
+ nyxWbSvgLabel(svg,50,158,'상승 신호','#b8c8dc','start',11);
+ nyxWbSvg(svg,'circle',{cx:172,cy:154,r:5,fill:colors.down});
+ nyxWbSvgLabel(svg,184,158,'하락 신호','#b8c8dc','start',11);
+ return {dates,today,maxIndex,maxScore,score,moving};
 }
 function nyxWeibullRender(){
  const status=$('nyxWbStatus'),result=$('nyxWbResult');
  if(!status||!result)return;
  const m=nyxWeibullPrediction(dailyPointsCache);
- if(!m.ready){status.textContent=m.why;result.style.display='none';return;}
- result.style.display='block';
- const e=m.active;
- status.textContent=`확정 자료 ${m.rows[0].date} ~ ${m.last.date} · 신호 ${m.events.length}건 · 반영 판정 ${m.settledCount}건 · 브라우저 계산`;
- $('nyxWbCenter').textContent=e?(e.sign>0?'상승':'하락')+` ${Math.abs(e.nyxRate*100).toFixed(2)}%`:'신호 없음';
- const withinWindow=e&&e.age<=NYX_LEAD_MAX;
- let label='예측 대기';
- if(e&&!withinWindow)label='최근 신호 없음';
- else if(e&&e.hit)label=`D+${e.hit} 반영 관측`;
- else if(e&&m.canEstimate)label=`D+${m.peak} 중심`;
- else if(e)label='학습 중';
- $('nyxWbRange').textContent=label;
+ if(!m.ready){status.style.display='block';status.textContent=m.why;result.style.display='none';return;}
+ result.style.display='block';status.textContent='';status.style.display='none';
+ const day=m.last;
+ $('nyxWbCenter').textContent=`${day.date.slice(5).replace('-','/')} · ${day.nr>=0?'+':''}${(100*(Math.exp(day.nr)-1)).toFixed(2)}%`;
+ $('nyxWbCount').textContent=`${m.recent.filter(e=>e.age<NYX_LEAD_MAX&&!e.hit).length}건`;
+ const graph=nyxWbProbabilityGraph($('nyxWbGraph'),m);
+ const strongest=graph.maxIndex>=0?graph.dates[graph.maxIndex].slice(5).replace('-','/'):'—';
+ const signs=new Set(graph.moving.map(e=>e.sign));
+ $('nyxWbRange').textContent=signs.size>1?`${strongest} · 방향 혼재`:strongest;
  const details=$('nyxWbDetails');details.replaceChildren();
- const add=t=>{const s=document.createElement('span');s.textContent=t;details.append(s)};
- if(e){add(`신호 ${e.date} · 경과 ${e.age}거래일`);add(e.hit?`동일 방향 반영 관측 D+${e.hit}`:withinWindow?'반영 여부 관찰 중':'5거래일 내 미반영');}
- add(`과거 신호 ${m.settledCount}건 · 반영 ${m.successCount}건`);
- if(m.canEstimate){add(`5거래일 내 추정 반영 ${(m.p5*100).toFixed(0)}% · 검증 전`);}
- else add(`확률 표시 보류 · 판정 완료 최소 ${NYX_LEAD_MIN_EVENTS}건 및 반영 5건 필요`);
- nyxWbProbabilityGraph($('nyxWbGraph'),m);
+ const add=t=>{const span=document.createElement('span');span.textContent=t;details.append(span);};
+ for(const e of m.recent.slice().reverse()){
+  const date=e.date.slice(5).replace('-','/');
+  const rate=(100*(Math.exp(e.nyxRate)-1)).toFixed(2);
+  const statusText=e.hit?`D+${e.hit} 반응 관측`:e.age>=NYX_LEAD_MAX?'5일 내 미반영':'관찰 중';
+  add(`${date} ${e.sign>0?'+':''}${rate}% · ${statusText}`);
+ }
+ if(!m.canEstimate)add(m.probabilities?'과거 관측 기반':'시차 자료 부족');add('미래 거래일은 휴장일 미반영');
 }
 
 async function aiRun(force=false,forecast=false){
@@ -1438,7 +1475,7 @@ async function aiRun(force=false,forecast=false){
    const el=$('nyxFxForecast');el.style.display='block';el.replaceChildren();
    const head=document.createElement('div');head.className='ai-analysis-head';head.textContent='Gemini 전망 실패 · 자체 통계모델 참고';
    const body=document.createElement('div');body.className='ai-insight';
-   body.textContent=local.ready?(local.canEstimate?`NYX Prediction: 닉스환율 신호 이후 원·달러 동일 방향 반영 시점은 D+${local.peak} 중심으로 추정됩니다. 5거래일 내 반영 가능성 ${(local.p5*100).toFixed(0)}% (검증 전).`:`NYX Prediction은 선행 시차 자료를 학습하고 있습니다. 완료된 신호 ${local.settledCount}건으로 아직 확률을 제시할 수 없습니다.`):'Gemini 응답 실패. 자체 예측모델도 일별 자료가 부족합니다.';
+   body.textContent=local.ready?(local.canEstimate?`NYX Prediction: 닉스환율 신호 이후 원·달러 동일 방향 반영 시점은 D+${local.peak} 중심으로 추정됩니다. 5거래일 내 반영 가능성 ${(local.p5*100).toFixed(0)}% (검증 전).`:`NYX Prediction은 최근 일별 신호와 과거 반영 사례를 함께 추적합니다. 추정 확률은 검증 중입니다.`):'Gemini 응답 실패. 자체 예측모델도 일별 자료가 부족합니다.';
    const note=document.createElement('div');note.className='note';note.textContent='위 내용은 Gemini 생성 결과가 아닙니다. API 실패 사유는 아래에 표시됩니다. 확률구간·적중률 미검증.';
    el.append(head,body,note);
   }
